@@ -1,5 +1,5 @@
 use page_table::{PageTable64, PagingMetaData};
-use page_table_entry::aarch64::A64PTE;
+use page_table_entry::aarch64_hv::A64PTEHV;
 
 /// Metadata of AArch64 hypervisor page tables (ipa to hpa).
 #[derive(Copy, Clone)]
@@ -13,4 +13,4 @@ impl PagingMetaData for A64HVPagingMetaData {
     const VA_MAX_BITS: usize = 40;  //  virtual address space. VTCR_EL2.T0SZ controls the size.
 }
 /// According to rust shyper, AArch64 translation table.
-pub type NestedPageTable<I> = PageTable64<A64HVPagingMetaData, A64PTE, I>;
+pub type NestedPageTable<I> = PageTable64<A64HVPagingMetaData, A64PTEHV, I>;

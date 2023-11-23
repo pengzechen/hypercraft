@@ -53,6 +53,41 @@ fn hvc_sys_handler(event: usize, root_paddr: usize, vm_ctx_addr: usize) -> Resul
         _ => Err(()),
     }
 }
+ 
+unsafe fn cache_invalidate(cache_level: usize) {
+    core::arch::asm!(
+        r#"
+        msr csselr_el1, {0}
+        mrs x4, ccsidr_el1 // read cache size id.
+        and x0, x4, #0x7
+        add x0, x0, #0x4 // x0 = cache line size.
+        ldr x3, =0x7fff
+        and x2, x3, x4, lsr #13 // x2 = cache set number – 1.
+        ldr x3, =0x3ff
+        and x3, x3, x4, lsr #3 // x3 = cache associativity number – 1.
+        clz w4, w3 // x4 = way position in the cisw instruction.
+        mov x5, #0 // x5 = way counter way_loop.
+    // way_loop:
+    1:
+        mov x6, #0 // x6 = set counter set_loop.
+    // set_loop:
+    2:
+        lsl x7, x5, x4
+        orr x7, {0}, x7 // set way.
+        lsl x8, x6, x0
+        orr x7, x7, x8 // set set.
+        dc csw, x7 // clean and invalidate cache line.
+        add x6, x6, #1 // increment set counter.
+        cmp x6, x2 // last set reached yet?
+        ble 2b // if not, iterate set_loop,
+        add x5, x5, #1 // else, next way.
+        cmp x5, x3 // last way reached yet?
+        ble 1b // if not, iterate way_loop
+        "#,
+        in(reg) cache_level,
+        options(nostack)
+    );
+}
 
 #[inline(never)]
 /// hvc handler for initial hv
@@ -68,85 +103,25 @@ fn init_hv(root_paddr: usize, vm_ctx_addr: usize) {
             msr cptr_el2, x3"
         );
     }
-        // init_page_table(root_paddr);
+    // dcache_clean_flush(0x70000000, 0xf000000);
+    let regs: &VmCpuRegisters = unsafe{core::mem::transmute(vm_ctx_addr)};
+    // set vm system related register
     msr!(VTTBR_EL2, root_paddr);
-        // init_sysregs();
+    regs.vm_system_regs.ext_regs_restore();
+
     unsafe {
+        cache_invalidate(0<<1);
+        cache_invalidate(1<<1);
         core::arch::asm!("
-            tlbi	alle2         // Flush tlb
+            ic  iallu
+            tlbi	alle2
+            tlbi	alle1         // Flush tlb
             dsb	nsh
             isb"
         );
-    }
-    
-    let regs: &VmCpuRegisters = unsafe{core::mem::transmute(vm_ctx_addr)};
-    // set vm system related register
-    regs.vm_system_regs.ext_regs_restore();
+    }   
+   
 }
-
-fn init_sysregs() {
-    use aarch64_cpu::{
-        asm::barrier,
-        registers::{HCR_EL2, SCTLR_EL2},
-    };
-    HCR_EL2.write(    
-        HCR_EL2::VM::Enable
-            + HCR_EL2::RW::EL1IsAarch64,
-    );  // Make irq and fiq do not route to el2
-    SCTLR_EL2.modify(SCTLR_EL2::M::Enable 
-                    + SCTLR_EL2::C::Cacheable 
-                    + SCTLR_EL2::I::Cacheable); // other fields need? EIS, EOS?
-    barrier::isb(barrier::SY);
-}
-
-fn init_page_table(vttbr: usize) {
-    use aarch64_cpu::registers::{VTCR_EL2, VTTBR_EL2};
-    /* 
-    VTCR_EL2.write(
-        VTCR_EL2::PS::PA_36B_64GB   //0b001 36 bits, 64GB.
-            + VTCR_EL2::TG0::Granule4KB
-            + VTCR_EL2::SH0::Inner
-            + VTCR_EL2::ORGN0::NormalWBRAWA
-            + VTCR_EL2::IRGN0::NormalWBRAWA
-            + VTCR_EL2::SL0.val(0b01)
-            + VTCR_EL2::T0SZ.val(64 - 36),
-    );
-    */
-    msr!(VTTBR_EL2, vttbr);
-}
-
-/* 
-// really need init MAIR_EL2 and TCR_EL2 ??
-// MAIR_EL2: Provides the memory attribute encodings corresponding to the possible 
-//           AttrIndx values in a Long-descriptor format translation table entry for 
-//           stage 1 translations at EL2.
-// TCR_EL2: When the Effective value of HCR_EL2.E2H is 0, this register controls stage 1 
-//          of the EL2 translation regime, that supports a single VA range, translated 
-//          using TTBR0_EL2.
-unsafe fn init_hv_mmu(token: usize) {
-    MAIR_EL2.write(
-        MAIR_EL2::Attr0_Device::nonGathering_nonReordering_noEarlyWriteAck
-            + MAIR_EL2::Attr1_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc
-            + MAIR_EL2::Attr1_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc
-            + MAIR_EL2::Attr2_Normal_Outer::NonCacheable
-            + MAIR_EL2::Attr2_Normal_Inner::NonCacheable,
-    );
-
-    TCR_EL2.write(
-        TCR_EL2::PS::Bits_48
-            + TCR_EL2::SH0::Inner
-            + TCR_EL2::TG0::KiB_4
-            + TCR_EL2::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
-            + TCR_EL2::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable
-            + TCR_EL2::T0SZ.val(64 - 39),
-    );
-
-    // barrier::isb(barrier::SY);
-    // SCTLR_EL2.modify(SCTLR_EL2::M::Enable + SCTLR_EL2::C::Cacheable + SCTLR_EL2::I::Cacheable);
-    // barrier::isb(barrier::SY);
-
-}
-*/
 
 #[inline(never)]
 fn hvc_call(

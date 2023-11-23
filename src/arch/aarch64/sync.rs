@@ -11,11 +11,13 @@
 use crate::arch::exception::*;
 use crate::arch::hvc::hvc_guest_handler;
 use crate::arch::ContextFrame;
-use crate::traits::ContextFrameTrait;
+use crate::arch::ContextFrameTrait;
 use crate::arch::vcpu::VmCpuRegisters;
 use crate::arch::hvc::{HVC_SYS, HVC_SYS_BOOT};
+use crate::arch::psci::smc_guest_handler;
 
-pub const HVC_RETURN_REG: usize = 0;
+const HVC_RETURN_REG: usize = 0;
+const SMC_RETURN_REG: usize = 0;
 
 pub fn data_abort_handler(ctx: &mut ContextFrame) {
     /* 
@@ -109,4 +111,26 @@ pub fn hvc_handler(ctx: &mut ContextFrame) {
             ctx.spsr = regs.guest_trap_context_regs.spsr;
         }
     }
+}
+
+pub fn smc_handler(ctx: &mut ContextFrame) {
+    debug!("this is smc_handler!!! ctx:\n{}", ctx);
+    let fid = ctx.gpr(0);
+    let x1 = ctx.gpr(1);
+    let x2 = ctx.gpr(2);
+    let x3 = ctx.gpr(3);
+
+    match smc_guest_handler(fid, x1, x2, x3) {
+        Ok(val) => {
+            ctx.set_gpr(SMC_RETURN_REG, val);
+        }
+        Err(_) => {
+            warn!("Failed to handle smc request fid 0x{:x}", fid);
+            ctx.set_gpr(SMC_RETURN_REG, usize::MAX);
+        }
+    }
+
+    let elr = ctx.exception_pc();
+    let val = elr + exception_next_instruction_step();
+    ctx.set_exception_pc(val);
 }

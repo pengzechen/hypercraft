@@ -14,8 +14,8 @@ use tock_registers::interfaces::*;
 
 use crate::mrs;
 use crate::arch::ContextFrame;
-use crate::arch::sync::{data_abort_handler, hvc_handler};
-use crate::traits::ContextFrameTrait;
+use crate::arch::sync::{data_abort_handler, hvc_handler, smc_handler};
+use crate::arch::ContextFrameTrait;
 
 //global_asm!(include_str!("exception.S"));
 
@@ -164,7 +164,7 @@ pub fn exception_data_abort_access_is_sign_ext() -> bool {
 /// deal with lower aarch64 synchronous exception
 #[no_mangle]
 pub extern "C" fn lower_aarch64_synchronous(ctx: &mut ContextFrame) {
-    debug!("lower_aarch64_synchronous exception class:0x{:X}", exception_class());
+    debug!("enter lower_aarch64_synchronous exception class:0x{:X}", exception_class());
     // current_cpu().set_context_addr(ctx);
 
     match exception_class() {
@@ -175,16 +175,22 @@ pub extern "C" fn lower_aarch64_synchronous(ctx: &mut ContextFrame) {
         0x16 => {
             hvc_handler(ctx);
         }
+        0x17 => {
+            smc_handler(ctx);
+        }
         // 0x18 todo？
         _ => {   
             panic!(
-                "handler not presents for EC_{} @ipa 0x{:x}, @pc 0x{:x}, @esr 0x{:x}, @sctlr_el1 0x{:x}, @vttbr_el2 0x{:x}, ",
+                "handler not presents for EC_{} @ipa 0x{:x}, @pc 0x{:x}, @esr 0x{:x}, @sctlr_el1 0x{:x}, @vttbr_el2 0x{:x}, @vtcr_el2: {:#x} hcr: {:#x} ctx:{}",
                 exception_class(),
                 exception_fault_addr(),
                 (*ctx).exception_pc(),
                 exception_esr(),
                 cortex_a::registers::SCTLR_EL1.get() as usize,
                 cortex_a::registers::VTTBR_EL2.get() as usize,
+                cortex_a::registers::VTCR_EL2.get() as usize,
+                cortex_a::registers::HCR_EL2.get() as usize,
+                ctx
             );
         },
     }

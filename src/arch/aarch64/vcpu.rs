@@ -21,9 +21,22 @@ use tock_registers::interfaces::*;
  
 use crate::arch::ContextFrame;
 use crate::arch::context_frame::VmContext;
-use crate::traits::ContextFrameTrait;
+use crate::arch::ContextFrameTrait;
 use crate::HyperCraftHal;
 use crate::arch::hvc::run_guest_by_trap2el2;
+
+// TSC, bit [19]
+const HCR_TSC_TRAP: usize = 1 << 19;
+
+/// Vcpu State
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VcpuState {
+    Inv = 0,
+    Runnable = 1,
+    Running = 2,
+    Blocked = 3,
+}
+
 
 /// (v)CPU register state that must be saved or restored when entering/exiting a VM or switching
 /// between VMs.
@@ -56,6 +69,8 @@ pub struct VCpu<H:HyperCraftHal> {
     pub vcpu_id: usize,
     /// Vcpu context
     pub regs: VmCpuRegisters,
+    /// Vcpu state
+    pub state: VcpuState,
     // pub vcpu_ctx: ContextFrame,
     // pub vm_ctx: VmContext,
     // pub vm: Option<Vm>,
@@ -69,6 +84,7 @@ impl <H:HyperCraftHal> VCpu<H> {
         Self {
             vcpu_id: id,
             regs: VmCpuRegisters::default(),
+            state: VcpuState::Inv,
             // vcpu_ctx: ContextFrame::default(),
             // vm_ctx: VmContext::default(),
             // vm: None,
@@ -126,16 +142,18 @@ impl <H:HyperCraftHal> VCpu<H> {
         self.regs.vm_system_regs.cntkctl_el1 = 0;
         self.regs.vm_system_regs.pmcr_el0 = 0;
         // self.regs.vm_system_regs.vtcr_el2 = 0x8001355c;
-        self.regs.vm_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB   //0b001 36 bits, 64GB.
+        self.regs.vm_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB   // 40bit PA, 1TB
                                           + VTCR_EL2::TG0::Granule4KB
                                           + VTCR_EL2::SH0::Inner
                                           + VTCR_EL2::ORGN0::NormalWBRAWA
                                           + VTCR_EL2::IRGN0::NormalWBRAWA
                                           + VTCR_EL2::SL0.val(0b01)
                                           + VTCR_EL2::T0SZ.val(64 - 40)).into();
-        //self.regs.vm_system_regs.hcr_el2 = 0x80000001;  // Maybe we do not need smc setting? passthrough gic.
         self.regs.vm_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
                                          + HCR_EL2::RW::EL1IsAarch64).into();
+        // trap el1 smc to el2
+        self.regs.vm_system_regs.hcr_el2 |= HCR_TSC_TRAP as u64;
+
         let mut vmpidr = 0;
         vmpidr |= 1 << 31;
         vmpidr |= self.vcpu_id;

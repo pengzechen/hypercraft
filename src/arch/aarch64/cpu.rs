@@ -6,7 +6,7 @@ use spin::{Mutex, Once};
 use crate::{HyperCraftHal, HyperResult, HyperError, HostPhysAddr, HostVirtAddr, GuestPhysAddr};
 use crate::arch::vcpu::VCpu;
 use crate::arch::ContextFrame;
-use crate::traits::ContextFrameTrait;
+use crate::arch::ContextFrameTrait;
 
 /// need to move to a suitable file?
 const PAGE_SIZE_4K: usize = 0x1000;
@@ -16,6 +16,24 @@ pub const CPU_STACK_SIZE: usize = PAGE_SIZE_4K * 128;
 pub const CONTEXT_GPR_NUM: usize = 31;
 pub const PTE_PER_PAGE: usize = 512;
 
+/// The base address of the per-CPU memory region.
+static PER_CPU_BASE: Once<HostPhysAddr> = Once::new();
+
+pub static mut CURRENT_CPU: Mutex<HostPhysAddr> = Mutex::new(0);
+
+pub fn set_current_cpu(addr: HostPhysAddr) {
+    unsafe {
+        let mut current_cpu = CURRENT_CPU.lock();
+        *current_cpu = addr;
+    }
+}
+pub fn get_current_cpu() -> HostPhysAddr {
+    unsafe {
+        let current_cpu = CURRENT_CPU.lock();
+        *current_cpu
+    }
+}
+
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 /// sits at the top of a secondary CPU's stack.
 #[repr(C)]
@@ -23,19 +41,20 @@ pub const PTE_PER_PAGE: usize = 512;
 pub struct PerCpu<H:HyperCraftHal>{   //stack_top_addr has no use yet?
     /// per cpu id
     pub cpu_id: usize,
-    stack_top_addr: HostVirtAddr,
+    /// current active vcpu
+    pub active_vcpu: Option<VCpu<H>>,
     /// save for correspond vcpus
     pub vcpu_queue: Mutex<VecDeque<usize>>,
+    stack_top_addr: HostVirtAddr,
+    
     marker: core::marker::PhantomData<H>,
 }
-
-/// The base address of the per-CPU memory region.
-static PER_CPU_BASE: Once<HostPhysAddr> = Once::new();
 
 impl <H: HyperCraftHal> PerCpu<H> {
     const fn new(cpu_id: usize, stack_top_addr: HostVirtAddr) -> Self {
         Self {
             cpu_id: cpu_id,
+            active_vcpu: None,
             stack_top_addr: stack_top_addr,
             vcpu_queue: Mutex::new(VecDeque::new()),
             marker: core::marker::PhantomData,
@@ -79,12 +98,10 @@ impl <H: HyperCraftHal> PerCpu<H> {
     pub fn setup_this_cpu(cpu_id: usize) -> HyperResult<()> {
         // Load TP with address of pur PerCpu struct.
         let tp = Self::ptr_for_cpu(cpu_id) as usize;
-
-        unsafe {
-            asm!("msr TPIDR_EL1, {}", in(reg) tp)
-            // Safe since we're the only users of TP.
-            // asm!("mv tp, {rs}", rs = in(reg) tp)
-        };
+        // unsafe {
+            // asm!("msr TPIDR_EL1, {}", in(reg) tp)
+        // };
+        set_current_cpu(tp);
         Ok(())
     }
 
@@ -92,8 +109,10 @@ impl <H: HyperCraftHal> PerCpu<H> {
     pub fn this_cpu() -> &'static mut PerCpu<H> {
         // Make sure PerCpu has been set up.
         assert!(PER_CPU_BASE.get().is_some());
-        let tp: u64;
-        unsafe { core::arch::asm!("mrs {}, TPIDR_EL1", out(reg) tp) };
+        // let tp: u64;
+        let tp = get_current_cpu() as u64;
+        // unsafe { core::arch::asm!("mrs {}, TPIDR_EL1", out(reg) tp) };
+        // let pcpu_ptr = tp as *mut PerCpu<H>;
         let pcpu_ptr = tp as *mut PerCpu<H>;
         let pcpu = unsafe {
             // Safe since TP is set uo to point to a valid PerCpu
@@ -109,7 +128,15 @@ impl <H: HyperCraftHal> PerCpu<H> {
         let result = Ok(vcpu);
         result
     }
-
+    /// Get the current active vcpu.
+    pub fn set_active_vcpu(&mut self, active_vcpu: Option<VCpu<H>>) {
+        self.active_vcpu = active_vcpu;
+    }
+    
+    /// Get the current active vcpu.
+    pub fn get_active_vcpu(&mut self) -> &mut VCpu<H> {
+        self.active_vcpu.as_mut().unwrap()
+    }
     /// Get stack top addr.
     fn stack_top_addr(&self) -> HostVirtAddr {
         self.stack_top_addr

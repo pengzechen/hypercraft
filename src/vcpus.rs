@@ -16,6 +16,8 @@ pub const VM_CPUS_MAX: usize = MAX_CPUS;
 pub struct VmCpus<H: HyperCraftHal> {
     inner: [Once<VCpu<H>>; VM_CPUS_MAX],
     marker: core::marker::PhantomData<H>,
+    /// The number of vCPUs in the set.
+    pub length: usize,
 }
 
 impl<H: HyperCraftHal> VmCpus<H> {
@@ -24,6 +26,7 @@ impl<H: HyperCraftHal> VmCpus<H> {
         Self {
             inner: [Once::INIT; VM_CPUS_MAX],
             marker: core::marker::PhantomData,
+            length: 0,
         }
     }
 
@@ -33,6 +36,7 @@ impl<H: HyperCraftHal> VmCpus<H> {
         let once_entry = self.inner.get(vcpu_id).ok_or(HyperError::BadState)?;
 
         once_entry.call_once(|| vcpu);
+        self.length += 1;
         Ok(())
     }
 
