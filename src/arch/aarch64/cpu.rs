@@ -45,17 +45,17 @@ pub struct PerCpu<H:HyperCraftHal>{   //stack_top_addr has no use yet?
     pub active_vcpu: Option<VCpu<H>>,
     /// save for correspond vcpus
     pub vcpu_queue: Mutex<VecDeque<usize>>,
-    stack_top_addr: HostVirtAddr,
+    // stack_top_addr: HostVirtAddr,
     
     marker: core::marker::PhantomData<H>,
 }
 
-impl <H: HyperCraftHal> PerCpu<H> {
-    const fn new(cpu_id: usize, stack_top_addr: HostVirtAddr) -> Self {
+impl <H: HyperCraftHal + 'static> PerCpu<H> {
+    const fn new(cpu_id: usize) -> Self {
         Self {
             cpu_id: cpu_id,
             active_vcpu: None,
-            stack_top_addr: stack_top_addr,
+            // stack_top_addr: stack_top_addr,
             vcpu_queue: Mutex::new(VecDeque::new()),
             marker: core::marker::PhantomData,
         }
@@ -63,8 +63,8 @@ impl <H: HyperCraftHal> PerCpu<H> {
 
     /// Initializes the `PerCpu` structures for each CPU. This (the boot CPU's) per-CPU
     /// area is initialized and loaded into TPIDR_EL1 as well.
-    pub fn init(boot_id: usize, stack_size: usize) -> HyperResult<()> {
-        let cpu_nums: usize = 1;
+    pub fn init(boot_id: usize) -> HyperResult<()> {
+        let cpu_nums: usize = 2;
         let pcpu_size = core::mem::size_of::<PerCpu<H>>() * cpu_nums;
         debug!("pcpu_size: {:#x}", pcpu_size);
         let pcpu_pages = H::alloc_pages((pcpu_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K)
@@ -72,15 +72,15 @@ impl <H: HyperCraftHal> PerCpu<H> {
         debug!("pcpu_pages: {:#x}", pcpu_pages);
         PER_CPU_BASE.call_once(|| pcpu_pages);
         for cpu_id in 0..cpu_nums {
-            let stack_top_addr = if cpu_id == boot_id {
+            /*let stack_top_addr = if cpu_id == boot_id {
                 let boot_stack_top = Self::boot_cpu_stack()?;
                 debug!("boot_stack_top: {:#x}", boot_stack_top);
                 boot_stack_top
             } else {
                 H::alloc_pages((stack_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K)
                     .ok_or(HyperError::NoMemory)?
-            };
-            let pcpu: PerCpu<H> = Self::new(cpu_id, stack_top_addr);
+            };*/
+            let pcpu: PerCpu<H> = Self::new(cpu_id);
             let ptr = Self::ptr_for_cpu(cpu_id);
             // Safety: ptr is guaranteed to be properly aligned and point to valid memory owned by
             // PerCpu. No other CPUs are alive at this point, so it cannot be concurrently modified
@@ -97,7 +97,8 @@ impl <H: HyperCraftHal> PerCpu<H> {
     /// Initializes the TP pointer to point to PerCpu data.
     pub fn setup_this_cpu(cpu_id: usize) -> HyperResult<()> {
         // Load TP with address of pur PerCpu struct.
-        let tp = Self::ptr_for_cpu(cpu_id) as usize;
+        let tp = PER_CPU_BASE.get().unwrap() + cpu_id * core::mem::size_of::<PerCpu<H>>();
+        // let tp = Self::ptr_for_cpu(cpu_id) as usize;
         // unsafe {
             // asm!("msr TPIDR_EL1, {}", in(reg) tp)
         // };
@@ -137,15 +138,22 @@ impl <H: HyperCraftHal> PerCpu<H> {
     pub fn get_active_vcpu(&mut self) -> &mut VCpu<H> {
         self.active_vcpu.as_mut().unwrap()
     }
+
+    /// Returns a pointer to the `PerCpu` for the given CPU.
+    pub fn ptr_for_cpu(cpu_id: usize) ->  &'static mut PerCpu<H> {
+        let pcpu_addr = PER_CPU_BASE.get().unwrap() + cpu_id * core::mem::size_of::<PerCpu<H>>();
+        let pcpu_ptr = pcpu_addr as *mut PerCpu<H>;
+        let pcpu = unsafe {
+            // Safe since TP is set uo to point to a valid PerCpu
+            pcpu_ptr.as_mut().unwrap()
+        };
+        pcpu
+    }
+
+    /* 
     /// Get stack top addr.
     fn stack_top_addr(&self) -> HostVirtAddr {
         self.stack_top_addr
-    }
-
-    /// Returns a pointer to the `PerCpu` for the given CPU.
-    fn ptr_for_cpu(cpu_id: usize) -> *const PerCpu<H> {
-        let pcpu_addr = PER_CPU_BASE.get().unwrap() + cpu_id * core::mem::size_of::<PerCpu<H>>();
-        pcpu_addr as *const PerCpu<H>
     }
 
     fn boot_cpu_stack() -> HyperResult<GuestPhysAddr> {
@@ -156,47 +164,5 @@ impl <H: HyperCraftHal> PerCpu<H> {
         // Ok(BOOT_STACK as GuestPhysAddr)
         Ok(0 as GuestPhysAddr)
     }
-
-}
-
-/*
-pub fn current_cpu() -> &'static mut Cpu {
-    // Make sure PerCpu has been set up.
-    assert!(PER_CPU_BASE.get().is_some());
-    let tp: u64;
-    unsafe { core::arch::asm!("mrs {}, TPIDR_EL2", out(reg) tp) };
-    let pcpu_ptr = tp as *mut Cpu<dyn HyperCraftHal>;
-    let pcpu = unsafe {
-        // Safe since TP is set uo to point to a valid PerCpu
-        pcpu_ptr.as_mut().unwrap()
-    };
-    pcpu
-}
-
- 
-#[def_percpu]
-pub static mut CPU: Cpu = Cpu::new(0);  // hard code for one cpu
-
-pub fn current_cpu() -> &'static mut Cpu {
-    unsafe {
-        let ptr: *const Cpu = CPU.current_ptr();
-        mem::transmute::<*const Cpu, &'static mut Cpu>(ptr)
-    }
-}
-
-pub fn init_cpu() {
-    cpu_interface_init();
-
-    let current_cpu = current_cpu();
-    let state = CpuState::CpuIdle;
-    let sp = current_cpu().stack.as_ptr() as usize + CPU_STACK_SIZE;
-    let size = core::mem::size_of::<ContextFrame>();
-    let context_addr = (sp - size) as *mut _;
-    CPU.with_current(|c| {
-        c.cpu_state = state;
-        c.context_addr = context_addr;
-    });
-
-    info!("Core {} init ok", current_cpu.cpu_id);
-}
 */
+}

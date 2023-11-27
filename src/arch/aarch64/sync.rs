@@ -114,7 +114,6 @@ pub fn hvc_handler(ctx: &mut ContextFrame) {
 }
 
 pub fn smc_handler(ctx: &mut ContextFrame) {
-    debug!("this is smc_handler!!! ctx:\n{}", ctx);
     let fid = ctx.gpr(0);
     let x1 = ctx.gpr(1);
     let x2 = ctx.gpr(2);

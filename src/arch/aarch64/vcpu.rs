@@ -158,7 +158,7 @@ impl <H:HyperCraftHal> VCpu<H> {
         vmpidr |= 1 << 31;
         vmpidr |= self.vcpu_id;
         self.regs.vm_system_regs.vmpidr_el2 = vmpidr as u64;
-        
+        debug!("hcr: {:#x}", self.regs.vm_system_regs.hcr_el2);
         // self.gic_ctx_reset(); // because of passthrough gic, do not need gic context anymore?
     }
 
