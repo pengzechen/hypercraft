@@ -23,7 +23,8 @@ extern crate alloc;
 
 #[cfg(target_arch = "aarch64")]
 #[path = "arch/aarch64/mod.rs"]
-mod arch;
+/// Aarch64 arch code.
+pub mod arch;
 #[cfg(target_arch = "riscv64")]
 #[path = "arch/riscv/mod.rs"]
 mod arch;
@@ -58,7 +59,7 @@ pub use memory::{
 pub use vcpus::VmCpus;
 
 #[cfg(target_arch = "aarch64")]
-pub use arch::{lower_aarch64_synchronous, VcpusArray, GICC, GICD, GICH, irq_aarch64_el2};
+pub use arch::VcpusArray;
 
 #[cfg(target_arch = "x86_64")]
 pub use arch::{VmxExitReason, VmxExitInfo};

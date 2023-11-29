@@ -19,48 +19,51 @@ use alloc::vec::Vec;
 
 use super::util::bit_get;
 
+/// A bitmap opeartion
 pub trait BitAlloc {
-    // The bitmap has a total of CAP bits, numbered from 0 to CAP-1 inclusively.
+    /// The bitmap has a total of CAP bits, numbered from 0 to CAP-1 inclusively.
     const CAP: usize;
 
-    // The default value. Workaround for `const fn new() -> Self`.
+    /// The default value. Workaround for `const fn new() -> Self`.
     #[allow(clippy::declare_interior_mutable_const)]
     const DEFAULT: Self;
 
-    // Set a bit.
+    /// Set a bit.
     fn set(&mut self, idx: usize);
 
-    // Clear a bit
+    /// Clear a bit
     fn clear(&mut self, idx: usize);
 
-    // Get a bit
+    /// Get a bit
     fn get(&self, idx: usize) -> usize;
 
     // Whether there are free bits remaining
     // fn any(&self) -> bool;
 }
 
-// A bitmap of 4K bits
+/// A bitmap of 4K bits
 pub type BitAlloc256 = BitMap<BitAlloc16>;
-// A bitmap of 4K bits
+/// A bitmap of 4K bits
 pub type BitAlloc4K = BitMap<BitAlloc256>;
-// A bitmap of 64K bits
+/// A bitmap of 64K bits
 pub type BitAlloc64K = BitMap<BitAlloc4K>;
-// A bitmap of 1M bits
+/// A bitmap of 1M bits
 pub type BitAlloc1M = BitMap<BitAlloc64K>;
-// A bitmap of 16M bits
+/// A bitmap of 16M bits
 pub type BitAlloc16M = BitMap<BitAlloc1M>;
-// A bitmap of 256M bits
+/// A bitmap of 256M bits
 pub type BitAlloc256M = BitMap<BitAlloc16M>;
 
 #[repr(C)]
 #[derive(Copy, Clone)]
+/// A bitmap
 pub struct BitMap<T: BitAlloc> {
-    // bitset: u16,
+    /// bitset: u16,
     map: [T; 16],
 }
 
 impl<T: BitAlloc> BitMap<T> {
+    /// Create a new bitmap
     pub const fn default() -> BitMap<T> {
         BitMap::<T> { map: [T::DEFAULT; 16] }
     }
@@ -94,6 +97,7 @@ impl<T: BitAlloc> BitAlloc for BitMap<T> {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq)]
+/// A bitmap of 16 bits
 pub struct BitAlloc16(u16);
 
 impl PartialEq for BitAlloc16 {
@@ -103,6 +107,7 @@ impl PartialEq for BitAlloc16 {
 }
 
 impl BitAlloc16 {
+    /// Create a new bitmap
     pub const fn default() -> BitAlloc16 {
         BitAlloc16(0)
     }
@@ -129,31 +134,34 @@ impl BitAlloc for BitAlloc16 {
     }
 }
 
-// flex bit map
+/// flex bit map
 #[derive(Clone)]
 pub struct FlexBitmap {
+    /// length
     pub len: usize,
+    /// map
     pub map: Vec<usize>,
 }
 
 impl FlexBitmap {
+    /// Create a new flex bitmap
     pub fn new(len: usize) -> FlexBitmap {
         let map = vec![0; (len + 64 - 1) / 64];
         FlexBitmap { len, map }
     }
-
+    /// Init a dirty flex bitmap
     pub fn init_dirty(&mut self) {
         for i in 0..self.map.len() {
             self.map[i] = usize::MAX;
         }
     }
-
+    /// clear flex bitmap
     pub fn clear(&mut self) {
         for i in 0..self.map.len() {
             self.map[i] = 0;
         }
     }
-
+    /// get a bit by idx
     pub fn get(&self, idx: usize) -> usize {
         if idx > self.len {
             panic!("too large idx {} for get bitmap", idx);
@@ -161,7 +169,7 @@ impl FlexBitmap {
         let val = self.map[idx / 64];
         bit_get(val, idx % 64)
     }
-
+    /// set a bit by idx
     pub fn set(&mut self, bit: usize, val: bool) {
         if bit > self.len {
             panic!("too large idx {} for set bitmap", bit);
@@ -172,7 +180,7 @@ impl FlexBitmap {
             self.map[bit / 64] &= !(1 << (bit % 64));
         }
     }
-
+    /// set bits by length
     pub fn set_bits(&mut self, bit: usize, len: usize, val: bool) {
         if bit + len > self.len {
             panic!("set_bits: too large idx {} for set bitmap", bit);
@@ -192,15 +200,15 @@ impl FlexBitmap {
             }
         }
     }
-
+    /// return a slice
     pub fn slice(&self) -> &[usize] {
         self.map.as_slice()
     }
-
+    /// return vector length
     pub fn vec_len(&self) -> usize {
         self.map.len()
     }
-
+    /// return how many ones in the bitmap
     pub fn sum(&self) -> usize {
         let mut sum = 0;
         for val in &self.map {
@@ -208,7 +216,7 @@ impl FlexBitmap {
         }
         sum
     }
-
+    /// return the first one bit
     pub fn first(&self) -> usize {
         let mut first = 0;
         for val in &self.map {

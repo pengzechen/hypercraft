@@ -1,17 +1,16 @@
 mod context_frame;
 mod cpu;
-mod exception;
-mod hvc;
-mod sync;
-mod utils;
-mod vcpu;
 mod vm;
 mod gic;
 mod ept;
-mod psci;
 mod vcpus_array;
-mod irq;
-mod ipi;
+
+/// hypervisor call hvc mod
+pub mod hvc;
+/// virtual cpu mod
+pub mod vcpu;
+/// utils for aarch64
+pub mod utils;
 
 // pub use gic::{GICC, GICD, GICH, GICD_BASE};
 pub use ept::NestedPageTable;
@@ -19,14 +18,11 @@ pub use vcpu::VCpu;
 pub use vm::VM;
 pub use cpu::PerCpu;
 pub use vcpus_array::VcpusArray;
-// pub use config::*;
 
 pub use page_table::PageSize;
-pub use gic::{GICH, GICD, GICC};
-pub use exception::lower_aarch64_synchronous;
-pub use irq::irq_aarch64_el2;
 
-type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;
+/// context frame for aarch64
+pub type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;
 
 /// Move to ARM register from system coprocessor register.
 /// MRS Xd, sysreg "Xd = sysreg"
@@ -60,24 +56,7 @@ macro_rules! msr {
     };
 }
 
-#[macro_export]
-macro_rules! declare_enum_with_handler {
-    (
-        $enum_vis:vis enum $enum_name:ident [$array_vis:vis $array:ident => $handler_type:ty] {
-            $($vis:vis $variant:ident => $handler:expr, )*
-        }
-    ) => {
-        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-        #[repr(usize)]
-        $enum_vis enum $enum_name {
-            $($vis $variant, )*
-        }
-        $array_vis static $array: &[$handler_type] = &[
-            $($handler, )*
-        ];
-    }
-}
-
+/*
 use core::arch::global_asm;
 global_asm!(include_str!("./memset.S"));
 global_asm!(include_str!("./memcpy.S"));
@@ -99,15 +78,24 @@ pub fn memcpy_safe(s1: *const u8, s2: *const u8, n: usize) -> *mut u8 {
     }
     unsafe { memcpy(s1, s2, n) }
 }
-
+*/
+/// aarch64 context frame trait
 pub trait ContextFrameTrait {
+    /// create a new context frame
     fn new(pc: usize, sp: usize, arg: usize) -> Self;
+    /// get the exception program counter
     fn exception_pc(&self) -> usize;
+    /// set the exception program counter
     fn set_exception_pc(&mut self, pc: usize);
+    /// get the stack pointer
     fn stack_pointer(&self) -> usize;
+    /// set the stack pointer
     fn set_stack_pointer(&mut self, sp: usize);
+    /// get the argument (register x0)
     fn set_argument(&mut self, arg: usize);
+    /// set gpr by idx
     fn set_gpr(&mut self, index: usize, val: usize);
+    /// get gpr by idx
     fn gpr(&self, index: usize) -> usize;
 }
 

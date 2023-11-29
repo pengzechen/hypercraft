@@ -31,9 +31,13 @@ const HCR_TSC_TRAP: usize = 1 << 19;
 /// Vcpu State
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VcpuState {
+    /// Invalid
     Inv = 0,
+    /// Runnable
     Runnable = 1,
+    /// Running
     Running = 2,
+    /// Blocked
     Blocked = 3,
 }
 

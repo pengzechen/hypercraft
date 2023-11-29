@@ -5,18 +5,39 @@ use tock_registers::interfaces::{ReadWriteable, Readable, Writeable};
 use crate::arch::vcpu::VmCpuRegisters;
 use crate::msr;
 
+/// HVC SYS type
 pub const HVC_SYS: usize = 0;
-
 /// HVC SYS event
 pub const HVC_SYS_BOOT: usize = 0;
 
 #[repr(C)]
+/// HVC default message
 pub struct HvcDefaultMsg {
+    /// hvc type id
     pub fid: usize,
+    /// hvc event
     pub event: usize,
 }
 
 #[inline(never)]
+/// Handles the HVC guest event.
+///
+/// # Arguments
+///
+/// * `hvc_type` - The type of HVC event.
+/// * `event` - The event identifier.
+/// * `x0` - The value of register x0.
+/// * `x1` - The value of register x1.
+/// * `_x2` - The value of register x2 (unused).
+/// * `_x3` - The value of register x3 (unused).
+/// * `_x4` - The value of register x4 (unused).
+/// * `_x5` - The value of register x5 (unused).
+/// * `_x6` - The value of register x6 (unused).
+///
+/// # Returns
+///
+/// Returns the result of the HVC guest handler.
+/// If the HVC type is unknown, an error is returned.
 pub fn hvc_guest_handler(
     hvc_type: usize,
     event: usize,
@@ -37,6 +58,16 @@ pub fn hvc_guest_handler(
     }
 }
 
+/// Runs the guest by trapping to EL2.
+///
+/// # Arguments
+///
+/// * `token` - The vttbr_el2 value.
+/// * `regs_addr` - The address of the registers.
+///
+/// # Returns
+///
+/// The result of the hvc_call function.
 pub fn run_guest_by_trap2el2(token: usize, regs_addr: usize) -> usize {
     // mode is in x7. hvc_type: HVC_SYS; event: HVC_SYS_BOOT
     hvc_call(token, regs_addr, 0, 0, 0, 0, 0, 0)
