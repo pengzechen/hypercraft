@@ -1,10 +1,13 @@
-use crate::{HyperCraftHal, GuestPageTableTrait, VmCpus, HyperResult};
+use alloc::boxed::Box;
+use crate::{HyperCraftHal, GuestPageTableTrait, VmCpus, HyperResult, VcpusArray};
+use crate::arch::VCpu;
 
 /// The guest VM
 #[repr(align(4096))]
+#[derive(Clone)]
 pub struct VM<H: HyperCraftHal, G: GuestPageTableTrait> {
     /// The vcpus belong to VM
-    vcpus: VmCpus<H>,
+    pub vcpus: VcpusArray<H>,
     /// The guest page table of VM
     gpt: G,
     /// VM id
@@ -13,7 +16,7 @@ pub struct VM<H: HyperCraftHal, G: GuestPageTableTrait> {
 
 impl <H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
     /// Create a new VM
-    pub fn new(vcpus: VmCpus<H>, gpt: G, id: usize)-> HyperResult<Self> {
+    pub fn new(vcpus: VcpusArray<H>, gpt: G, id: usize)-> HyperResult<Self> {
         Ok(Self { 
                 vcpus: vcpus, 
                 gpt: gpt, 
@@ -29,6 +32,11 @@ impl <H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
         vcpu.init(kernel_entry_point, device_tree_ipa);
     }
 
+    /// Add a vcpu to VM
+    pub fn add_vm_vcpu(&mut self, vcpu: VCpu<H>) {
+        self.vcpus.add_vcpu(vcpu).unwrap();
+    }
+
     /// Init VM vcpus. Set kernel entry point.
     pub fn init_vm_vcpus(&mut self, kernel_entry_point: usize, device_tree_ipa: usize) {
         for i in 0..self.vcpus.length {
@@ -40,8 +48,14 @@ impl <H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
     pub fn run(&mut self, vcpu_id: usize) {
         let vcpu = self.vcpus.get_vcpu(vcpu_id).unwrap();
         debug!("run vcpu{}", vcpu.vcpu_id);
+        warn!("vcpu: {:?}", vcpu.regs);
         let vttbr_token = (self.vm_id << 48) | self.gpt.token();
         debug!("vttbr_token: 0x{:X}", self.gpt.token());
         vcpu.run(vttbr_token);
     }
 }
+
+extern "C" {
+    pub fn run_vm_vcpu(vm_id: usize, vcpu_id: usize);
+}
+

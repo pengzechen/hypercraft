@@ -18,6 +18,7 @@ tock-registers = "0.8.1"
 page_table = { path = "../page_table" }
 page_table_entry = { path = "../page_table_entry" }
 spinlock = { path = "../spinlock" }
+lazy_init = { path = "../lazy_init" }
 
 memory_addr = { path = "../memory_addr" }
 

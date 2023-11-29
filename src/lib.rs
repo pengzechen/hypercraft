@@ -58,7 +58,7 @@ pub use memory::{
 pub use vcpus::VmCpus;
 
 #[cfg(target_arch = "aarch64")]
-pub use arch::lower_aarch64_synchronous;
+pub use arch::{lower_aarch64_synchronous, VcpusArray, GICC, GICD, GICH, irq_aarch64_el2};
 
 #[cfg(target_arch = "x86_64")]
 pub use arch::{VmxExitReason, VmxExitInfo};

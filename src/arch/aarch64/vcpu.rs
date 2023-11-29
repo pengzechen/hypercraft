@@ -63,10 +63,12 @@ impl VmCpuRegisters {
 }
 
 /// A virtual CPU within a guest
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VCpu<H:HyperCraftHal> {
     /// Vcpu id
     pub vcpu_id: usize,
+    /// vm id
+    pub vm_id: usize,
     /// Vcpu context
     pub regs: VmCpuRegisters,
     /// Vcpu state
@@ -80,15 +82,12 @@ pub struct VCpu<H:HyperCraftHal> {
 
 impl <H:HyperCraftHal> VCpu<H> {
     /// Create a new vCPU
-    pub fn new(id: usize) -> Self {
+    pub fn new(vm_id:usize, id: usize) -> Self {
         Self {
             vcpu_id: id,
+            vm_id: vm_id,
             regs: VmCpuRegisters::default(),
             state: VcpuState::Inv,
-            // vcpu_ctx: ContextFrame::default(),
-            // vm_ctx: VmContext::default(),
-            // vm: None,
-            // int_list: vec![],
             marker: PhantomData,
         }
     }
@@ -150,7 +149,8 @@ impl <H:HyperCraftHal> VCpu<H> {
                                           + VTCR_EL2::SL0.val(0b01)
                                           + VTCR_EL2::T0SZ.val(64 - 40)).into();
         self.regs.vm_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
-                                         + HCR_EL2::RW::EL1IsAarch64).into();
+                                         + HCR_EL2::RW::EL1IsAarch64
+                                         + HCR_EL2::IMO::EnableVirtualIRQ).into();
         // trap el1 smc to el2
         self.regs.vm_system_regs.hcr_el2 |= HCR_TSC_TRAP as u64;
 
@@ -158,7 +158,6 @@ impl <H:HyperCraftHal> VCpu<H> {
         vmpidr |= 1 << 31;
         vmpidr |= self.vcpu_id;
         self.regs.vm_system_regs.vmpidr_el2 = vmpidr as u64;
-        debug!("hcr: {:#x}", self.regs.vm_system_regs.hcr_el2);
         // self.gic_ctx_reset(); // because of passthrough gic, do not need gic context anymore?
     }
 

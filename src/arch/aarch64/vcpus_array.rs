@@ -1,50 +1,60 @@
-use arrayvec::ArrayVec;
-use spin::Once;
+use alloc::vec::Vec;
 
-use crate::arch::vcpu::VCpu;
-use crate::{HyperCraftHal, HyperResult, HyperError, HostPhysAddr, HostVirtAddr, GuestPhysAddr};
+use crate::arch::{VCpu, VM};
+use crate::{GuestPageTableTrait, HyperCraftHal, HyperError, HyperResult,};
 
 
 /// The maximum number of CPUs we can support.
-pub const MAX_CPUS: usize = 4;
+pub const MAX_CPUS: usize = 8;
 
-pub const VCPUS_MAX: usize = MAX_CPUS;
+pub const VM_CPUS_MAX: usize = MAX_CPUS;
 
 /// The set of vCPUs in a VM.
-#[derive(Default)]
-pub struct VCpusArray{
-    inner: [Once<VCpu>; VCPUS_MAX],
+#[derive(Default, Clone, Debug)]
+pub struct VcpusArray<H: HyperCraftHal> {
+    inner: Vec<Option<VCpu<H>>>,
+    marker: core::marker::PhantomData<H>,
+    /// The number of vCPUs in the set.
+    pub length: usize,
 }
 
-impl VCpusArray {
+impl<H: HyperCraftHal> VcpusArray<H> {
     /// Creates a new vCPU tracking structure.
     pub fn new() -> Self {
+        let mut inner = Vec::with_capacity(VM_CPUS_MAX);
+        for _ in 0..VM_CPUS_MAX {
+            inner.push(None);
+        }
         Self {
-            inner: [Once::INIT; VCPUS_MAX],
+            inner: inner,
             marker: core::marker::PhantomData,
+            length: 0,
         }
     }
 
     /// Adds the given vCPU to the set of vCPUs.
-    pub fn add_vcpu(&mut self, vcpu: VCpu) -> HyperResult<()> {
+    pub fn add_vcpu(&mut self, vcpu: VCpu<H>) -> HyperResult<()> {
+        if self.length >= VM_CPUS_MAX {
+            return Err(HyperError::NotFound);
+        }
         let vcpu_id = vcpu.vcpu_id();
-        let once_entry = self.inner.get(vcpu_id).ok_or(HyperError::BadState)?;
-
-        once_entry.call_once(|| vcpu);
+        self.inner[vcpu_id] = Some(vcpu);
+        self.length += 1;
         Ok(())
     }
-
+    
     /// Returns a reference to the vCPU with `vcpu_id` if it exists.
     pub fn get_vcpu(&mut self, vcpu_id: usize) -> HyperResult<&mut VCpu<H>> {
-        let vcpu = self
-            .inner
-            .get_mut(vcpu_id)
-            .and_then(|once| once.get_mut())
-            .ok_or(HyperError::NotFound)?;
-        Ok(vcpu)
+        if vcpu_id >= VM_CPUS_MAX {
+            return Err(HyperError::BadState);
+        }
+        match &mut self.inner[vcpu_id] {
+            Some(vcpu) => Ok(vcpu),
+            None => Err(HyperError::BadState),
+        }
     }
 }
 
 // Safety: Each VCpu is wrapped with a Mutex to provide safe concurrent access to VCpu.
-unsafe impl Sync for VCpusArray {}
-unsafe impl Send for VCpusArray {}
+unsafe impl<H: HyperCraftHal> Sync for VcpusArray<H> {}
+unsafe impl<H: HyperCraftHal> Send for VcpusArray<H> {}

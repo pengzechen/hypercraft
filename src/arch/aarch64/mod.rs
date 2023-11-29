@@ -9,17 +9,22 @@ mod vm;
 mod gic;
 mod ept;
 mod psci;
+mod vcpus_array;
+mod irq;
+mod ipi;
 
 // pub use gic::{GICC, GICD, GICH, GICD_BASE};
 pub use ept::NestedPageTable;
 pub use vcpu::VCpu;
 pub use vm::VM;
 pub use cpu::PerCpu;
-
+pub use vcpus_array::VcpusArray;
 // pub use config::*;
 
 pub use page_table::PageSize;
+pub use gic::{GICH, GICD, GICC};
 pub use exception::lower_aarch64_synchronous;
+pub use irq::irq_aarch64_el2;
 
 type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;
 
@@ -53,6 +58,24 @@ macro_rules! msr {
             core::arch::asm!(concat!("msr ", stringify!($reg), ", {0}"), in(reg) $val, options(nomem, nostack));
         }
     };
+}
+
+#[macro_export]
+macro_rules! declare_enum_with_handler {
+    (
+        $enum_vis:vis enum $enum_name:ident [$array_vis:vis $array:ident => $handler_type:ty] {
+            $($vis:vis $variant:ident => $handler:expr, )*
+        }
+    ) => {
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+        #[repr(usize)]
+        $enum_vis enum $enum_name {
+            $($vis $variant, )*
+        }
+        $array_vis static $array: &[$handler_type] = &[
+            $($handler, )*
+        ];
+    }
 }
 
 use core::arch::global_asm;

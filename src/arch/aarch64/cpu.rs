@@ -12,7 +12,6 @@ use crate::arch::ContextFrameTrait;
 const PAGE_SIZE_4K: usize = 0x1000;
 
 pub const CPU_MASTER: usize = 0;
-pub const CPU_STACK_SIZE: usize = PAGE_SIZE_4K * 128;
 pub const CONTEXT_GPR_NUM: usize = 31;
 pub const PTE_PER_PAGE: usize = 512;
 
@@ -123,9 +122,9 @@ impl <H: HyperCraftHal + 'static> PerCpu<H> {
     }
 
     /// Create a `Vcpu`, set the entry point to `entry` and bind this vcpu into the current CPU.
-    pub fn create_vcpu(&mut self, vcpu_id: usize) -> HyperResult<VCpu<H>> {
+    pub fn create_vcpu(&mut self, vm_id: usize, vcpu_id: usize) -> HyperResult<VCpu<H>> {
         self.vcpu_queue.lock().push_back(vcpu_id);
-        let vcpu = VCpu::<H>::new(vcpu_id);
+        let vcpu = VCpu::<H>::new(vm_id, vcpu_id);
         let result = Ok(vcpu);
         result
     }
