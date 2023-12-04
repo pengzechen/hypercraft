@@ -18,17 +18,17 @@ pub const PTE_PER_PAGE: usize = 512;
 /// The base address of the per-CPU memory region.
 static PER_CPU_BASE: Once<HostPhysAddr> = Once::new();
 
-pub static mut CURRENT_CPU: Mutex<HostPhysAddr> = Mutex::new(0);
+pub static mut CURRENT_CPU_HV: Mutex<HostPhysAddr> = Mutex::new(0);
 
 pub fn set_current_cpu(addr: HostPhysAddr) {
     unsafe {
-        let mut current_cpu = CURRENT_CPU.lock();
+        let mut current_cpu = CURRENT_CPU_HV.lock();
         *current_cpu = addr;
     }
 }
 pub fn get_current_cpu() -> HostPhysAddr {
     unsafe {
-        let current_cpu = CURRENT_CPU.lock();
+        let current_cpu = CURRENT_CPU_HV.lock();
         *current_cpu
     }
 }

@@ -74,17 +74,18 @@ pub fn run_guest_by_trap2el2(token: usize, regs_addr: usize) -> usize {
 }
 
 #[inline(never)]
-fn hvc_sys_handler(event: usize, root_paddr: usize, vm_ctx_addr: usize) -> Result<usize, ()> {
+fn hvc_sys_handler(event: usize, _root_paddr: usize, _vm_ctx_addr: usize) -> Result<usize, ()> {
     match event {
         HVC_SYS_BOOT => {
-            init_hv(root_paddr, vm_ctx_addr);
-            Ok(0)
+            // init_hv(root_paddr, vm_ctx_addr);
+            panic!("abandon area");
+            // Ok(0)
         }
 
         _ => Err(()),
     }
 }
- 
+/* 
 unsafe fn cache_invalidate(cache_level: usize) {
     core::arch::asm!(
         r#"
@@ -153,7 +154,7 @@ fn init_hv(root_paddr: usize, vm_ctx_addr: usize) {
     }   
    
 }
-
+*/
 #[inline(never)]
 fn hvc_call(
     x0: usize, 
