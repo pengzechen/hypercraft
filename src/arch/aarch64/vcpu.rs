@@ -164,8 +164,8 @@ impl <H:HyperCraftHal> VCpu<H> {
                                           + VTCR_EL2::SL0.val(0b01)
                                           + VTCR_EL2::T0SZ.val(64 - 40)).into();
         self.regs.vm_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
-                                         + HCR_EL2::RW::EL1IsAarch64
-                                         + HCR_EL2::IMO::EnableVirtualIRQ).into();
+                                         + HCR_EL2::RW::EL1IsAarch64 ).into();
+                                        // + HCR_EL2::IMO::EnableVirtualIRQ).into();
         // trap el1 smc to el2
         self.regs.vm_system_regs.hcr_el2 |= HCR_TSC_TRAP as u64;
 
