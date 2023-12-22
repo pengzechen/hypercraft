@@ -78,8 +78,8 @@ fn hvc_sys_handler(event: usize, _root_paddr: usize, _vm_ctx_addr: usize) -> Res
     match event {
         HVC_SYS_BOOT => {
             // init_hv(root_paddr, vm_ctx_addr);
-            panic!("abandon area");
-            // Ok(0)
+            // panic!("abandon area");
+            Ok(0)
         }
 
         _ => Err(()),

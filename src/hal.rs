@@ -1,7 +1,7 @@
 use crate::{GuestPageTableTrait, HostPageNum, HostPhysAddr, HostVirtAddr, HyperResult, memory::PAGE_SIZE_4K};
 
 /// The interfaces which the underlginh software(kernel or hypervisor) must implement.
-pub trait HyperCraftHal: Sized {
+pub trait HyperCraftHal: Sized + Clone {
     /// Page size.
     const PAGE_SIZE: usize = PAGE_SIZE_4K;
 

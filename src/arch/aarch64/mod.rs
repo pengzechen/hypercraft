@@ -11,6 +11,10 @@ pub mod hvc;
 pub mod vcpu;
 /// utils for aarch64
 pub mod utils;
+/// vitual gic
+pub mod vgic;
+/// emulate device
+pub mod emu;
 
 // pub use gic::{GICC, GICD, GICH, GICD_BASE};
 pub use ept::NestedPageTable;
@@ -20,6 +24,7 @@ pub use cpu::PerCpu;
 pub use vcpus_array::VcpusArray;
 
 pub use page_table::PageSize;
+pub use gic::IrqState;
 
 /// context frame for aarch64
 pub type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;

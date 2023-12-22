@@ -45,6 +45,8 @@ pub struct PerCpu<H:HyperCraftHal>{   //stack_top_addr has no use yet?
     /// save for correspond vcpus
     pub vcpu_queue: Mutex<VecDeque<usize>>,
     // stack_top_addr: HostVirtAddr,
+    /// context address of this cpu
+    pub ctx: Option<usize>,
     
     marker: core::marker::PhantomData<H>,
 }
@@ -57,6 +59,7 @@ impl <H: HyperCraftHal + 'static> PerCpu<H> {
             // stack_top_addr: stack_top_addr,
             vcpu_queue: Mutex::new(VecDeque::new()),
             marker: core::marker::PhantomData,
+            ctx: None,
         }
     }
 
@@ -124,18 +127,24 @@ impl <H: HyperCraftHal + 'static> PerCpu<H> {
     /// Create a `Vcpu`, set the entry point to `entry` and bind this vcpu into the current CPU.
     pub fn create_vcpu(&mut self, vm_id: usize, vcpu_id: usize) -> HyperResult<VCpu<H>> {
         self.vcpu_queue.lock().push_back(vcpu_id);
-        let vcpu = VCpu::<H>::new(vm_id, vcpu_id);
+        let vcpu = VCpu::<H>::new(vm_id, vcpu_id, self.cpu_id);
         let result = Ok(vcpu);
         result
     }
+    
     /// Get the current active vcpu.
     pub fn set_active_vcpu(&mut self, active_vcpu: Option<VCpu<H>>) {
         self.active_vcpu = active_vcpu;
     }
     
     /// Get the current active vcpu.
-    pub fn get_active_vcpu(&mut self) -> &mut VCpu<H> {
-        self.active_vcpu.as_mut().unwrap()
+    pub fn get_active_vcpu(&self) -> Option<&VCpu<H>> {
+        self.active_vcpu.as_ref()
+    }
+
+    /// Get the current active vcpu.
+    pub fn get_active_vcpu_mut(&mut self) -> Option<&mut VCpu<H>> {
+        self.active_vcpu.as_mut()
     }
 
     /// Returns a pointer to the `PerCpu` for the given CPU.
@@ -147,6 +156,108 @@ impl <H: HyperCraftHal + 'static> PerCpu<H> {
             pcpu_ptr.as_mut().unwrap()
         };
         pcpu
+    }
+
+    /// set ctx of this cpu
+    pub fn set_ctx(&mut self, ctx: &mut ContextFrame) {
+        self.ctx = Some(ctx as *mut _ as usize);
+    }
+
+    /// get ctx of this cpu
+    pub fn get_ctx(&mut self) -> Option<&mut ContextFrame> {
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                Some(unsafe { &mut *ctx })
+            }
+            None => None,
+        }
+    }
+
+    /// clear ctx of this cpu
+    pub fn clear_ctx(&mut self) {
+        self.ctx = None;
+    }
+
+    /// set gpr by index of this cpu ctx
+    pub fn set_gpr(&self, idx: usize, val: usize) {
+        if idx >= CONTEXT_GPR_NUM {
+            return;
+        }
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                unsafe {
+                    (*ctx).set_gpr(idx, val);
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// get gpr by index of this cpu ctx
+    pub fn get_gpr(&self, idx: usize) -> usize {
+        if idx >= CONTEXT_GPR_NUM {
+            return 0;
+        }
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                unsafe { (*ctx).gpr(idx) }
+            }
+            None => 0,
+        }
+    }
+
+    /// get elr of this cpu ctx
+    pub fn get_elr(&self) -> usize {
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                unsafe { (*ctx).exception_pc() }
+            }
+            None => 0,
+        }
+    }
+
+    /// get sp of this cpu ctx
+    pub fn get_spsr(&self) -> usize {
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                unsafe { (*ctx).spsr as usize }
+            }
+            None => 0,
+        }
+    }
+
+    /// get sp of this cpu ctx
+    pub fn set_elr(&self, val: usize) {
+        match self.ctx {
+            Some(ctx_addr) => {
+                if ctx_addr < 0x1000 {
+                    panic!("illegal ctx addr {:x}", ctx_addr);
+                }
+                let ctx = ctx_addr as *mut ContextFrame;
+                unsafe { (*ctx).set_exception_pc(val) }
+            }
+            None => {}
+        }
     }
 
     /* 

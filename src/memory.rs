@@ -17,7 +17,7 @@ pub type HostPageNum = usize;
 pub const PAGE_SIZE_4K: usize = 0x1000;
 
 /// Guest page table trait.
-pub trait GuestPageTableTrait {
+pub trait GuestPageTableTrait: Clone {
     /// Create a new guest page table.
     fn new() -> HyperResult<Self>
     where

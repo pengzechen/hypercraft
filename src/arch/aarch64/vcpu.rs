@@ -8,7 +8,6 @@
 // MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 // See the Mulan PSL v2 for more details.
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::mem::size_of;
 use core::arch::global_asm;
@@ -76,6 +75,8 @@ pub struct VCpu<H:HyperCraftHal> {
     pub vcpu_id: usize,
     /// vm id
     pub vm_id: usize,
+    /// pcpu id
+    pub pcpu_id: usize,
     /// Vcpu context
     pub regs: VmCpuRegisters,
     /// Vcpu state
@@ -93,10 +94,11 @@ extern "C" {
 
 impl <H:HyperCraftHal> VCpu<H> {
     /// Create a new vCPU
-    pub fn new(vm_id:usize, id: usize) -> Self {
+    pub fn new(vm_id:usize, id: usize, pcpu_id: usize) -> Self {
         Self {
             vcpu_id: id,
             vm_id: vm_id,
+            pcpu_id: pcpu_id,
             regs: VmCpuRegisters::default(),
             state: VcpuState::Inv,
             marker: PhantomData,
@@ -144,6 +146,11 @@ impl <H:HyperCraftHal> VCpu<H> {
         self.regs.guest_trap_context_regs.set_exception_pc(elr);
     }
 
+    /// Get general purpose register
+    pub fn get_gpr(&mut self, idx: usize) {
+        self.regs.guest_trap_context_regs.gpr(idx);
+    }
+
     /// Set general purpose register
     pub fn set_gpr(&mut self, idx: usize, val: usize) {
         self.regs.guest_trap_context_regs.set_gpr(idx, val);
@@ -151,9 +158,11 @@ impl <H:HyperCraftHal> VCpu<H> {
 
     /// Init guest context. Also set some el2 register value.
     fn init_vm_context(&mut self) {
+        CNTHCTL_EL2.modify(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
         self.regs.vm_system_regs.cntvoff_el2 = 0;
-        self.regs.vm_system_regs.sctlr_el1 = 0x30C50830;
         self.regs.vm_system_regs.cntkctl_el1 = 0;
+
+        self.regs.vm_system_regs.sctlr_el1 = 0x30C50830;
         self.regs.vm_system_regs.pmcr_el0 = 0;
         // self.regs.vm_system_regs.vtcr_el2 = 0x8001355c;
         self.regs.vm_system_regs.vtcr_el2 = (VTCR_EL2::PS::PA_40B_1TB   // 40bit PA, 1TB
@@ -164,8 +173,8 @@ impl <H:HyperCraftHal> VCpu<H> {
                                           + VTCR_EL2::SL0.val(0b01)
                                           + VTCR_EL2::T0SZ.val(64 - 40)).into();
         self.regs.vm_system_regs.hcr_el2 = (HCR_EL2::VM::Enable
-                                         + HCR_EL2::RW::EL1IsAarch64 ).into();
-                                        // + HCR_EL2::IMO::EnableVirtualIRQ).into();
+                                         + HCR_EL2::RW::EL1IsAarch64 // ).into();
+                                         + HCR_EL2::IMO::EnableVirtualIRQ).into();
         // trap el1 smc to el2
         self.regs.vm_system_regs.hcr_el2 |= HCR_TSC_TRAP as u64;
 

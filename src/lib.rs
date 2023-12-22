@@ -59,7 +59,7 @@ pub use memory::{
 pub use vcpus::VmCpus;
 
 #[cfg(target_arch = "aarch64")]
-pub use arch::VcpusArray;
+pub use arch::{VcpusArray, IrqState};
 
 #[cfg(target_arch = "x86_64")]
 pub use arch::{VmxExitReason, VmxExitInfo};

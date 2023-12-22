@@ -43,14 +43,36 @@ impl<H: HyperCraftHal> VcpusArray<H> {
         Ok(())
     }
     
-    /// Returns a reference to the vCPU with `vcpu_id` if it exists.
-    pub fn get_vcpu(&mut self, vcpu_id: usize) -> HyperResult<&mut VCpu<H>> {
+    /// Return true if vcpu exist
+    pub fn is_vcpu_exist(&self, vcpu_id: usize) -> bool {
         if vcpu_id >= VM_CPUS_MAX {
-            return Err(HyperError::BadState);
+            return false;
+        }
+        match & self.inner[vcpu_id] {
+            Some(_) => true,
+            None => false,
+        }
+    }
+
+    /// Returns a reference to the vCPU with `vcpu_id` if it exists.
+    pub fn get_vcpu(&self, vcpu_id: usize) -> Option<& VCpu<H>> {
+        if vcpu_id >= VM_CPUS_MAX {
+            return None;
+        }
+        match & self.inner[vcpu_id] {
+            Some(vcpu) => Some(vcpu),
+            None => None,
+        }
+    }
+
+    /// Returns a mut reference to the vCPU with `vcpu_id` if it exists.
+    pub fn get_vcpu_mut(&mut self, vcpu_id: usize) -> Option<&mut VCpu<H>> {
+        if vcpu_id >= VM_CPUS_MAX {
+            return None;
         }
         match &mut self.inner[vcpu_id] {
-            Some(vcpu) => Ok(vcpu),
-            None => Err(HyperError::BadState),
+            Some(vcpu) => Some(vcpu),
+            None => None,
         }
     }
 }

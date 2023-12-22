@@ -11,6 +11,9 @@
 use core::ptr;
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use alloc::sync::Arc;
+use core::any::Any;
+
 static TRACE: AtomicBool = AtomicBool::new(true);
 
 #[inline(always)]
