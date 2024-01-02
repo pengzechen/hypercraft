@@ -4,6 +4,7 @@ use core::fmt::{Display, Formatter};
 use spin::Mutex;
 
 use super::vgic::Vgic;
+use super::vuart::Vuart;
 use crate::{HyperCraftHal, GuestPageTableTrait};
 
 /// Emulated device
@@ -11,6 +12,8 @@ use crate::{HyperCraftHal, GuestPageTableTrait};
 pub enum EmuDevs<H: HyperCraftHal, G:GuestPageTableTrait> {
     /// Virtual gic
     Vgic(Arc<Vgic<H, G>>),
+    /// Virtual uart
+    Vuart(Vuart),
     /* 
     VirtioBlk(VirtioMmio),
     VirtioNet(VirtioMmio),

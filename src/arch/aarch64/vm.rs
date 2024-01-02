@@ -9,6 +9,10 @@ use crate::{GuestPageTableTrait, HyperCraftHal, HyperResult, VcpusArray, VmCpus}
 use super::emu::*;
 use super::utils::*;
 use super::vgic::*;
+use super::vuart::*;
+
+const VGIC_DEV_ID: usize = 0;
+const UART_DEV_ID: usize = 1;
 
 /// The guest VM
 #[repr(align(4096))]
@@ -89,7 +93,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
 
     /// Get vm vgic
     pub fn vgic(&self) -> Arc<Vgic<H, G>> {
-        match &self.emu_devs[self.intc_dev_id] {
+        match &self.emu_devs[VGIC_DEV_ID] {
             EmuDevs::<H, G>::Vgic(vgic) => {
                 return vgic.clone();
             }
@@ -99,6 +103,30 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
         }
     }
 
+    /// Get vm vgic
+    pub fn vuart(&self) -> &Vuart {
+        match &self.emu_devs[UART_DEV_ID] {
+            EmuDevs::<H, G>::Vuart(vuart) => {
+                return vuart;
+            }
+            _ => {
+                panic!("vm{} cannot find vuart", self.vm_id);
+            }
+        }
+    }
+
+    /// Get vm vgic
+    pub fn vuart_mut(&mut self) -> &mut Vuart {
+        match &mut self.emu_devs[UART_DEV_ID] {
+            EmuDevs::<H, G>::Vuart(vuart) => {
+                return vuart;
+            }
+            _ => {
+                panic!("vm{} cannot find vuart", self.vm_id);
+            }
+        }
+    }
+    
     /// Set vm emulated device by index
     pub fn set_emu_devs(&mut self, idx: usize, emu: EmuDevs<H, G>) {
         if idx < self.emu_devs.len() {

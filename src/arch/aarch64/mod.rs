@@ -13,6 +13,9 @@ pub mod vcpu;
 pub mod utils;
 /// vitual gic
 pub mod vgic;
+/// virtual uart
+pub mod vuart;
+
 /// emulate device
 pub mod emu;
 
