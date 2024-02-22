@@ -14,7 +14,7 @@ impl<H: HyperCraftHal> PerCpu<H> {
     /// Create an uninitialized instance.
     pub fn new(cpu_id: usize) -> Self {
         Self {
-            cpu_id: cpu_id,
+            cpu_id,
             arch: VmxPerCpuState::new(),
         }
     }

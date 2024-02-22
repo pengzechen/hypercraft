@@ -1,24 +1,24 @@
 use alloc::collections::VecDeque;
-use x86_64::registers::debug;
 use core::fmt::{Debug, Formatter, Result};
 use core::{arch::asm, mem::size_of};
+use x86_64::registers::debug;
 
 use bit_field::BitField;
 use x86::bits64::vmx;
-use x86::controlregs::{ Xcr0, xcr0 as xcr0_read, xcr0_write };
+use x86::controlregs::{xcr0 as xcr0_read, xcr0_write, Xcr0};
 use x86::dtables::{self, DescriptorTablePointer};
 use x86::segmentation::SegmentSelector;
 use x86_64::registers::control::{Cr0, Cr0Flags, Cr3, Cr4, Cr4Flags};
 
+use super::definitions::VmxExitReason;
 use super::region::{MsrBitmap, VmxRegion};
 use super::vmcs::{
     self, VmcsControl32, VmcsControl64, VmcsControlNW, VmcsGuest16, VmcsGuest32, VmcsGuest64,
     VmcsGuestNW, VmcsHost16, VmcsHost32, VmcsHost64, VmcsHostNW,
 };
 use super::VmxPerCpuState;
-use super::definitions::VmxExitReason;
-use crate::arch::{msr::Msr, memory::NestedPageFaultInfo, regs::GeneralRegisters};
-use crate::{GuestPhysAddr, HostPhysAddr, HyperCraftHal, HyperResult, HyperError, VmxExitInfo};
+use crate::arch::{memory::NestedPageFaultInfo, msr::Msr, regs::GeneralRegisters};
+use crate::{GuestPhysAddr, HostPhysAddr, HyperCraftHal, HyperError, HyperResult, VmxExitInfo};
 
 pub struct XState {
     host_xcr0: u64,
@@ -33,7 +33,12 @@ impl XState {
         let xcr0 = unsafe { xcr0_read().bits() };
         let xss = Msr::IA32_XSS.read();
 
-        Self { host_xcr0: xcr0, guest_xcr0: xcr0, host_xss: xss, guest_xss: xss }
+        Self {
+            host_xcr0: xcr0,
+            guest_xcr0: xcr0,
+            host_xss: xss,
+            guest_xss: xss,
+        }
     }
 
     fn enable_xsave() {
@@ -86,15 +91,24 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
         self.vcpu_id
     }
 
+    /// Set up vcpu's vmcs revision id.
+    pub fn set_up_vmcs_revision_id(&self, revision_id: u32) {
+        self.vmcs.set_vmcs_revision_id(revision_id)
+    }
+
     /// Bind this [`VmxVcpu`] to current logical processor.
     pub fn bind_to_current_processor(&self) -> HyperResult {
-        unsafe { vmx::vmptrld(self.vmcs.phys_addr() as u64)?; }
+        unsafe {
+            vmx::vmptrld(self.vmcs.phys_addr() as u64)?;
+        }
         Ok(())
     }
 
     /// Unbind this [`VmxVcpu`] from current logical processor.
     pub fn unbind_from_current_processor(&self) -> HyperResult {
-        unsafe { vmx::vmclear(self.vmcs.phys_addr() as u64)?;  }
+        unsafe {
+            vmx::vmclear(self.vmcs.phys_addr() as u64)?;
+        }
         Ok(())
     }
 
@@ -104,15 +118,17 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
         if self.launched {
             self.inject_pending_events().unwrap();
         }
-        
+
         // Run guest
         self.load_guest_xstate();
-        unsafe { 
+        unsafe {
             if self.launched {
                 self.vmx_resume();
             } else {
                 self.launched = true;
-                VmcsHostNW::RSP.write(&self.host_stack_top as *const _ as usize).unwrap();
+                VmcsHostNW::RSP
+                    .write(&self.host_stack_top as *const _ as usize)
+                    .unwrap();
 
                 self.vmx_launch();
             }
@@ -121,7 +137,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
         // Handle vm-exits
         let exit_info = self.exit_info().unwrap();
-        trace!("VM exit: {:#x?}", exit_info);    
+        trace!("VM exit: {:#x?}", exit_info);
 
         let cr4 = VmcsGuestNW::CR4.read().unwrap();
         if cr4.get_bit(18) {
@@ -129,13 +145,13 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
         }
 
         match self.builtin_vmexit_handler(&exit_info) {
-            Some(result) => {   
+            Some(result) => {
                 if result.is_err() {
                     panic!("VmxVcpu failed to handle a VM-exit that should be handled by itself: {:?}, error {:?}, vcpu: {:#x?}", exit_info.exit_reason, result.unwrap_err(), self);
                 }
 
                 None
-            },
+            }
             None => Some(exit_info),
         }
     }
@@ -283,8 +299,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
     fn setup_vmcs_guest(&mut self, entry: GuestPhysAddr) -> HyperResult {
         let cr0_guest = Cr0Flags::EXTENSION_TYPE | Cr0Flags::NUMERIC_ERROR;
-        let cr0_host_owned =
-            Cr0Flags::NUMERIC_ERROR; // | Cr0Flags::NOT_WRITE_THROUGH | Cr0Flags::CACHE_DISABLE;
+        let cr0_host_owned = Cr0Flags::NUMERIC_ERROR; // | Cr0Flags::NOT_WRITE_THROUGH | Cr0Flags::CACHE_DISABLE;
         let cr0_read_shadow = Cr0Flags::NUMERIC_ERROR;
         VmcsGuestNW::CR0.write(cr0_guest.bits() as _)?;
         VmcsControlNW::CR0_GUEST_HOST_MASK.write(cr0_host_owned.bits() as _)?;
@@ -365,7 +380,11 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
             Msr::IA32_VMX_PROCBASED_CTLS.read() as u32,
             (CpuCtrl::UNCOND_IO_EXITING | CpuCtrl::USE_MSR_BITMAPS | CpuCtrl::SECONDARY_CONTROLS)
                 .bits(),
-            (CpuCtrl::CR3_LOAD_EXITING | CpuCtrl::CR3_STORE_EXITING | CpuCtrl::CR8_LOAD_EXITING | CpuCtrl::CR8_STORE_EXITING).bits(),
+            (CpuCtrl::CR3_LOAD_EXITING
+                | CpuCtrl::CR3_STORE_EXITING
+                | CpuCtrl::CR8_LOAD_EXITING
+                | CpuCtrl::CR8_STORE_EXITING)
+                .bits(),
         )?;
 
         // Enable EPT, RDTSCP, INVPCID, and unrestricted guest.
@@ -425,7 +444,6 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
         VmcsControl64::MSR_BITMAPS_ADDR.write(self.msr_bitmap.phys_addr() as _)?;
         Ok(())
     }
-
 }
 
 /// Get ready then vmlaunch or vmresume.
@@ -446,14 +464,13 @@ macro_rules! vmx_entry_with {
 }
 
 impl<H: HyperCraftHal> VmxVcpu<H> {
-    
     #[naked]
     /// Enter guest with vmlaunch.
-    /// 
+    ///
     /// `#[naked]` is essential here, without it the rust compiler will think `&mut self` is not used and won't give us correct %rdi.
-    /// 
+    ///
     /// This function itself never returns, but [`Self::vmx_exit`] will do the return for this.
-    /// 
+    ///
     /// The return value is a dummy value.
     unsafe extern "C" fn vmx_launch(&mut self) -> usize {
         vmx_entry_with!("vmlaunch")
@@ -461,7 +478,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
     #[naked]
     /// Enter guest with vmresume.
-    /// 
+    ///
     /// See [`Self::vmx_launch`] for detail.
     unsafe extern "C" fn vmx_resume(&mut self) -> usize {
         vmx_entry_with!("vmresume")
@@ -469,7 +486,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
     #[naked]
     /// Return after vm-exit.
-    /// 
+    ///
     /// The return value is a dummy value.
     unsafe extern "C" fn vmx_exit(&mut self) -> usize {
         asm!(
@@ -510,7 +527,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
     }
 
     /// Handle vm-exits than can and should be handled by [`VmxVcpu`] itself.
-    /// 
+    ///
     /// Return the result or None if the vm-exit was not handled.
     fn builtin_vmexit_handler(&mut self, exit_info: &VmxExitInfo) -> Option<HyperResult> {
         if exit_info.entry_failure {
@@ -524,24 +541,42 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
         match exit_info.exit_reason {
             VmxExitReason::INTERRUPT_WINDOW => Some(self.set_interrupt_window(false)),
             VmxExitReason::XSETBV => Some(self.handle_xsetbv()),
-            VmxExitReason::CR_ACCESS => panic!("Guest's access to cr not allowed: {:#x?}, {:#x?}", self, vmcs::cr_access_info()),
+            VmxExitReason::CR_ACCESS => panic!(
+                "Guest's access to cr not allowed: {:#x?}, {:#x?}",
+                self,
+                vmcs::cr_access_info()
+            ),
             VmxExitReason::EXCEPTION_NMI => {
                 let int_info = self.interrupt_exit_info().unwrap();
 
-                error!("exit_info: {:#x?}\nexception: {:#x?}\nvcpu: {:#x?}", exit_info, int_info, self);
+                error!(
+                    "exit_info: {:#x?}\nexception: {:#x?}\nvcpu: {:#x?}",
+                    exit_info, int_info, self
+                );
                 self.queue_event(int_info.vector, None);
 
-                debug!("CR4.OSXSAVE: {}", VmcsGuestNW::CR4.read().unwrap().get_bit(18));
-                
+                debug!(
+                    "CR4.OSXSAVE: {}",
+                    VmcsGuestNW::CR4.read().unwrap().get_bit(18)
+                );
+
                 use raw_cpuid::{cpuid, CpuIdResult};
                 let cpuid_01 = cpuid!(0x1, 0x0);
-                debug!("CPUID.01H.ECX: {:#x?}, bit26: {}", cpuid_01.ecx, cpuid_01.ecx.get_bit(26));
+                debug!(
+                    "CPUID.01H.ECX: {:#x?}, bit26: {}",
+                    cpuid_01.ecx,
+                    cpuid_01.ecx.get_bit(26)
+                );
 
                 let cpuid_0d_01 = cpuid!(0xd, 0x1);
-                debug!("CPUID.0DH(ECX=1).EAX: {:#x?}, bit3: {}", cpuid_0d_01.eax, cpuid_0d_01.eax.get_bit(3));
+                debug!(
+                    "CPUID.0DH(ECX=1).EAX: {:#x?}, bit3: {}",
+                    cpuid_0d_01.eax,
+                    cpuid_0d_01.eax.get_bit(3)
+                );
 
                 Some(Ok(()))
-            },
+            }
             VmxExitReason::CPUID => Some(self.handle_cpuid()),
             _ => None,
         }
@@ -569,7 +604,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
                 res.ecx &= !FEATURE_VMX;
                 res.ecx |= FEATURE_HYPERVISOR;
                 res
-            },
+            }
             LEAF_STRUCTURED_EXTENDED_FEATURE_FLAGS_ENUMERATION => {
                 let mut res = cpuid!(regs_clone.rax, regs_clone.rcx);
                 if regs_clone.rcx == 0 {
@@ -577,7 +612,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
                 }
 
                 res
-            },
+            }
             LEAF_PROCESSOR_EXTENDED_STATE_ENUMERATION => {
                 self.load_guest_xstate();
                 let res = cpuid!(regs_clone.rax, regs_clone.rcx);
@@ -602,9 +637,11 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
         trace!(
             "VM exit: CPUID({:#x}, {:#x}): {:?}",
-            regs_clone.rax, regs_clone.rcx, res
+            regs_clone.rax,
+            regs_clone.rcx,
+            res
         );
-        
+
         let regs = self.regs_mut();
         regs.rax = res.eax as _;
         regs.rbx = res.ebx as _;
@@ -624,32 +661,40 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 
         // TODO: get host-supported xcr0 mask by cpuid and reject any guest-xsetbv violating that
         if index == XCR_XCR0 {
-            Xcr0::from_bits(value).and_then(|x| {
-                if !x.contains(Xcr0::XCR0_FPU_MMX_STATE) {
-                    return None;
-                } 
-        
-                if x.contains(Xcr0::XCR0_AVX_STATE) && !x.contains(Xcr0::XCR0_SSE_STATE) {
-                    return None;
-                }
-
-                if x.contains(Xcr0::XCR0_BNDCSR_STATE) ^ x.contains(Xcr0::XCR0_BNDREG_STATE) {
-                    return None;
-                }
-
-                if x.contains(Xcr0::XCR0_OPMASK_STATE) || x.contains(Xcr0::XCR0_ZMM_HI256_STATE) || x.contains(Xcr0::XCR0_HI16_ZMM_STATE) {
-                    if !x.contains(Xcr0::XCR0_AVX_STATE) || !x.contains(Xcr0::XCR0_OPMASK_STATE) || !x.contains(Xcr0::XCR0_ZMM_HI256_STATE) || !x.contains(Xcr0::XCR0_HI16_ZMM_STATE) {
+            Xcr0::from_bits(value)
+                .and_then(|x| {
+                    if !x.contains(Xcr0::XCR0_FPU_MMX_STATE) {
                         return None;
                     }
-                }
 
-                Some(x)
-            })
-            .ok_or(HyperError::InvalidParam)
-            .and_then(|x| {
-                self.xstate.guest_xcr0 = x.bits();
-                self.advance_rip(VM_EXIT_INSTR_LEN_XSETBV)
-            })
+                    if x.contains(Xcr0::XCR0_AVX_STATE) && !x.contains(Xcr0::XCR0_SSE_STATE) {
+                        return None;
+                    }
+
+                    if x.contains(Xcr0::XCR0_BNDCSR_STATE) ^ x.contains(Xcr0::XCR0_BNDREG_STATE) {
+                        return None;
+                    }
+
+                    if x.contains(Xcr0::XCR0_OPMASK_STATE)
+                        || x.contains(Xcr0::XCR0_ZMM_HI256_STATE)
+                        || x.contains(Xcr0::XCR0_HI16_ZMM_STATE)
+                    {
+                        if !x.contains(Xcr0::XCR0_AVX_STATE)
+                            || !x.contains(Xcr0::XCR0_OPMASK_STATE)
+                            || !x.contains(Xcr0::XCR0_ZMM_HI256_STATE)
+                            || !x.contains(Xcr0::XCR0_HI16_ZMM_STATE)
+                        {
+                            return None;
+                        }
+                    }
+
+                    Some(x)
+                })
+                .ok_or(HyperError::InvalidParam)
+                .and_then(|x| {
+                    self.xstate.guest_xcr0 = x.bits();
+                    self.advance_rip(VM_EXIT_INSTR_LEN_XSETBV)
+                })
         } else {
             // xcr0 only
             Err(crate::HyperError::NotSupported)

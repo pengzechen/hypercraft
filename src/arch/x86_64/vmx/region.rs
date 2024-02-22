@@ -1,9 +1,9 @@
 use bit_field::BitField;
 use core::marker::PhantomData;
 
-use crate::{HyperCraftHal, HostPhysAddr, GuestPhysAddr};
-use crate::{HyperResult, HyperError};
 use crate::arch::memory::PhysFrame;
+use crate::{GuestPhysAddr, HostPhysAddr, HyperCraftHal};
+use crate::{HyperError, HyperResult};
 
 /// VMCS/VMXON region in 4K size. (SDM Vol. 3C, Section 24.2)
 #[derive(Debug)]
@@ -28,11 +28,16 @@ impl<H: HyperCraftHal> VmxRegion<H> {
         Ok(Self { frame })
     }
 
+    pub fn set_vmcs_revision_id(&self, revision_id: u32) {
+        unsafe {
+            (*(self.frame.as_mut_ptr() as *mut u32)).set_bits(0..=30, revision_id);
+        }
+    }
+
     pub fn phys_addr(&self) -> HostPhysAddr {
         self.frame.start_paddr()
     }
 }
-
 
 #[derive(Debug)]
 pub struct MsrBitmap<H: HyperCraftHal> {

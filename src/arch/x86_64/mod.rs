@@ -6,14 +6,18 @@ mod regs;
 mod ept;
 mod memory;
 mod msr;
-mod vmx;
 mod percpu;
+mod vmx;
 
 use core::marker::PhantomData;
 
-use crate::{GuestPageTableTrait, HyperCraftHal, VmCpus, HyperResult, vcpus, HyperError, hal::{PerCpuDevices, PerVmDevices}};
+use crate::{
+    hal::{PerCpuDevices, PerVmDevices},
+    vcpus, GuestPageTableTrait, HyperCraftHal, HyperError, HyperResult, VmCpus,
+};
 use bit_set::BitSet;
 use page_table::PagingIf;
+use spin::Mutex;
 
 const VM_EXIT_INSTR_LEN_VMCALL: u8 = 3;
 
@@ -27,10 +31,10 @@ pub fn init_hv_runtime() {
 /// Nested page table define.
 pub use ept::ExtendedPageTable as NestedPageTable;
 
+pub use percpu::PerCpu;
 /// VCpu define.
 pub use vmx::VmxVcpu as VCpu;
-pub use percpu::PerCpu;
-pub use vmx::{VmxExitReason, VmxExitInfo};
+pub use vmx::{VmxExitInfo, VmxExitReason};
 
 // pub use device::{Devices, PortIoDevice};
 
@@ -38,38 +42,54 @@ pub use vmx::{VmxExitReason, VmxExitInfo};
 
 /// VM define.
 pub struct VM<H: HyperCraftHal, PD: PerCpuDevices<H>, VD: PerVmDevices<H>> {
-    vcpus: VmCpus<H, PD>,
+    id: usize,
+    vcpus: Mutex<VmCpus<H, PD>>,
     vcpu_bond: BitSet,
-    device: VD,
+    device: Mutex<VD>,
 }
 
 impl<H: HyperCraftHal, PD: PerCpuDevices<H>, VD: PerVmDevices<H>> VM<H, PD, VD> {
     /// Create a new [`VM`].
-    pub fn new(vcpus: VmCpus<H, PD>) -> Self {
-        Self { vcpus, vcpu_bond: BitSet::new(), device: VD::new().unwrap() }
-    }
-
-    /// Bind the specified [`VCpu`] to current physical processor.
-    pub fn bind_vcpu(&mut self, vcpu_id: usize) -> HyperResult<(&mut VCpu<H>, &mut PD)> {
-        if self.vcpu_bond.contains(vcpu_id) {
-            Err(HyperError::InvalidParam)
-        } else {
-            match self.vcpus.get_vcpu_and_device(vcpu_id) {
-                Ok((vcpu, device)) => {
-                    self.vcpu_bond.insert(vcpu_id);
-                    vcpu.bind_to_current_processor()?;
-                    Ok((vcpu, device))
-                },
-                e @ Err(_) => e,
-            }
+    pub fn new(id: usize, vcpus: VmCpus<H, PD>) -> Self {
+        Self {
+            id,
+            vcpus: Mutex::new(vcpus),
+            vcpu_bond: BitSet::new(),
+            device: Mutex::new(VD::new().unwrap()),
         }
     }
 
+    /// Get vm id.
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    // /// Bind the specified [`VCpu`] to current physical processor.
+    // pub fn bind_vcpu(&self, vcpu_id: usize) -> HyperResult<(&mut VCpu<H>, &mut PD)> {
+    //     if self.vcpu_bond.contains(vcpu_id) {
+    //         Err(HyperError::InvalidParam)
+    //     } else {
+    //         match self.vcpus.lock().get_vcpu_and_device(vcpu_id) {
+    //             Ok((vcpu, device)) => {
+    //                 self.vcpu_bond.insert(vcpu_id);
+    //                 vcpu.bind_to_current_processor()?;
+    //                 Ok((vcpu, device))
+    //             }
+    //             e @ Err(_) => e,
+    //         }
+    //     }
+    // }
+
     #[allow(unreachable_code)]
     /// Run a specified [`VCpu`] on current logical vcpu.
-    pub fn run_vcpu(&mut self, vcpu_id: usize) -> HyperResult {
-        let (vcpu, vcpu_device) = self.vcpus.get_vcpu_and_device(vcpu_id).unwrap();
-        
+    pub fn run_vcpu(&self, vcpu_id: usize, _vmcs_revision_id: u32) -> HyperResult {
+        let mut vcpus = self.vcpus.lock();
+        let (vcpu, vcpu_device) = vcpus.get_vcpu_and_device(vcpu_id).unwrap();
+
+        debug!("vcpu {} bind_to_current_processor", vcpu_id);
+        // vcpu.set_up_vmcs_revision_id(vmcs_revision_id);
+        vcpu.bind_to_current_processor()?;
+
         loop {
             if let Some(exit_info) = vcpu.run() {
                 // we need to handle vm-exit this by ourselves
@@ -86,18 +106,27 @@ impl<H: HyperCraftHal, PD: PerCpuDevices<H>, VD: PerVmDevices<H>> VM<H, PD, VD> 
 
                     vcpu.advance_rip(VM_EXIT_INSTR_LEN_VMCALL)?;
                 } else {
-                    let result = vcpu_device.vmexit_handler(vcpu, &exit_info)
-                        .or_else(|| self.device.vmexit_handler(vcpu, &exit_info));
+                    let result = vcpu_device
+                        .vmexit_handler(vcpu, &exit_info)
+                        .or_else(|| self.device.lock().vmexit_handler(vcpu, &exit_info));
 
                     match result {
                         Some(result) => {
                             if result.is_err() {
-                                panic!("VM failed to handle a vm-exit: {:?}, error {:?}, vcpu: {:#x?}", exit_info.exit_reason, result.unwrap_err(), vcpu);
+                                panic!(
+                                    "VM failed to handle a vm-exit: {:?}, error {:?}, vcpu: {:#x?}",
+                                    exit_info.exit_reason,
+                                    result.unwrap_err(),
+                                    vcpu
+                                );
                             }
-                        },
+                        }
                         None => {
-                            panic!("nobody wants to handle this vm-exit: {:?}, vcpu: {:#x?}", exit_info, vcpu);
-                        },
+                            panic!(
+                                "nobody wants to handle this vm-exit: {:?}, vcpu: {:#x?}",
+                                exit_info, vcpu
+                            );
+                        }
                     }
                 }
             }
@@ -111,12 +140,12 @@ impl<H: HyperCraftHal, PD: PerCpuDevices<H>, VD: PerVmDevices<H>> VM<H, PD, VD> 
     /// Unbind the specified [`VCpu`] bond by [`VM::<H>::bind_vcpu`].
     pub fn unbind_vcpu(&mut self, vcpu_id: usize) -> HyperResult {
         if self.vcpu_bond.contains(vcpu_id) {
-            match self.vcpus.get_vcpu_and_device(vcpu_id) {
+            match self.vcpus.lock().get_vcpu_and_device(vcpu_id) {
                 Ok((vcpu, _)) => {
                     self.vcpu_bond.remove(vcpu_id);
                     vcpu.unbind_from_current_processor()?;
                     Ok(())
-                },
+                }
                 Err(e) => Err(e),
             }
         } else {
@@ -124,15 +153,16 @@ impl<H: HyperCraftHal, PD: PerCpuDevices<H>, VD: PerVmDevices<H>> VM<H, PD, VD> 
         }
     }
 
-    /// Get per-vm devices.
-    pub fn devices(&mut self) -> &mut VD {
-        &mut self.device
-    }
+    // /// Get per-vm devices.
+    // pub fn devices(&mut self) -> &mut VD {
+    //     &mut self.device
+    // }
 
-    /// Get vcpu and its devices by its id.
-    pub fn get_vcpu_and_device(&mut self, vcpu_id: usize) -> HyperResult<(&mut VCpu<H>, &mut PD)> {
-        self.vcpus.get_vcpu_and_device(vcpu_id)
-    }
+    // /// Get vcpu and its devices by its id.
+    // pub fn get_vcpu_and_device(&mut self, vcpu_id: usize) -> HyperResult<(&mut VCpu<H>, &mut PD)> {
+    //     let mut lock = self.vcpus.lock();
+    //     lock.get_vcpu_and_device(vcpu_id)
+    // }
 }
 
 /// VM exit information.
@@ -143,4 +173,3 @@ pub enum GprIndex {}
 
 /// Hypercall message.
 pub enum HyperCallMsg {}
-
