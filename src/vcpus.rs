@@ -1,19 +1,28 @@
+
+use crate::arch::{
+    VCpu, 
+    VM
+};
+
+use crate::{
+    GuestPageTableTrait, 
+    HyperCraftHal, 
+    HyperError, 
+    HyperResult,
+};
+
 use alloc::boxed::Box;
 use arrayvec::ArrayVec;
 use spin::Once;
 
-use crate::arch::{VCpu, VM};
-use crate::{GuestPageTableTrait, HyperCraftHal, HyperError, HyperResult,};
 
 
-/// The maximum number of CPUs we can support.
-pub const MAX_CPUS: usize = 8;
-
+pub const MAX_CPUS: usize = 8; /// The maximum number of CPUs we can support.
 pub const VM_CPUS_MAX: usize = MAX_CPUS;
 
-/// The set of vCPUs in a VM.
-#[derive(Default)]
-pub struct VmCpus<H: HyperCraftHal> {
+
+#[derive(Default)] /// The set of vCPUs in a VM.
+pub struct VmCpus<H: HyperCraftHal> {  
     inner: [Once<VCpu<H>>; VM_CPUS_MAX],
     marker: core::marker::PhantomData<H>,
 }
@@ -45,6 +54,7 @@ impl<H: HyperCraftHal> VmCpus<H> {
             .ok_or(HyperError::NotFound)?;
         Ok(vcpu)
     }
+
 }
 
 // Safety: Each VCpu is wrapped with a Mutex to provide safe concurrent access to VCpu.

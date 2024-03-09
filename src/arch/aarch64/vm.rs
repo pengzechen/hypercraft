@@ -1,4 +1,9 @@
-use crate::{HyperCraftHal, GuestPageTableTrait, VmCpus, HyperResult};
+use crate::{
+    HyperCraftHal, 
+    GuestPageTableTrait, 
+    VmCpus, 
+    HyperResult
+};
 
 /// The guest VM
 #[repr(align(4096))]

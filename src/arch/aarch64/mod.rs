@@ -14,7 +14,6 @@ pub use ept::NestedPageTable;
 pub use vcpu::VCpu;
 pub use vm::VM;
 pub use cpu::PerCpu;
-
 // pub use config::*;
 
 pub use page_table::PageSize;
@@ -28,12 +27,20 @@ type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;
 macro_rules! mrs {
     ($val: expr, $reg: expr, $asm_width:tt) => {
         unsafe {
-            core::arch::asm!(concat!("mrs {0:", $asm_width, "}, ", stringify!($reg)), out(reg) $val, options(nomem, nostack));
+            core::arch::asm!(concat!("mrs {0:", $asm_width, "}, ", 
+                stringify!($reg)), 
+                out(reg) $val, 
+                options(nomem, nostack)
+            );
         }
     };
     ($val: expr, $reg: expr) => {
         unsafe {
-            core::arch::asm!(concat!("mrs {0}, ", stringify!($reg)), out(reg) $val, options(nomem, nostack));
+            core::arch::asm!(concat!("mrs {0}, ", 
+                stringify!($reg)), 
+                out(reg) $val, 
+                options(nomem, nostack)
+            );
         }
     };
 }
@@ -44,19 +51,25 @@ macro_rules! mrs {
 macro_rules! msr {
     ($reg: expr, $val: expr, $asm_width:tt) => {
         unsafe {
-            core::arch::asm!(concat!("msr ", stringify!($reg), ", {0:", $asm_width, "}"), in(reg) $val, options(nomem, nostack));
+            core::arch::asm!( concat!("msr ", stringify!($reg), ", {0:", $asm_width, "}"), 
+                in(reg) $val, 
+                options(nomem, nostack)
+            );
         }
     };
     ($reg: expr, $val: expr) => {
         unsafe {
-            core::arch::asm!(concat!("msr ", stringify!($reg), ", {0}"), in(reg) $val, options(nomem, nostack));
+            core::arch::asm!(concat!("msr ", stringify!($reg), ", {0}"), 
+                in(reg) $val, 
+                options(nomem, nostack)
+            );
         }
     };
 }
 
-use core::arch::global_asm;
-global_asm!(include_str!("./memset.S"));
-global_asm!(include_str!("./memcpy.S"));
+core::arch::global_asm!(include_str!("./memset.S"));
+core::arch::global_asm!(include_str!("./memcpy.S"));
+
 extern "C" {
     pub fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8;
     pub fn memcpy(s1: *const u8, s2: *const u8, n: usize) -> *mut u8;
