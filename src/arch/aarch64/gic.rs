@@ -1,11 +1,14 @@
 use spin::Mutex;
 use spinlock::SpinNoIrq;
 
-use arm_gic::gic_v2::{GicDistributor, GicHypervisorInterface, GicCpuInterface};
+use arm_gic::gic_v2::{
+    GicDistributor, 
+    GicHypervisorInterface, 
+    GicCpuInterface
+};
+
 use arm_gic::GIC_LIST_REGS_NUM;
-
 use crate::arch::utils::bit_extract;
-
 pub static GICD: Option<&SpinNoIrq<GicDistributor>> = None;
 pub static GICC: Option<&GicCpuInterface> = None;
 pub static GICH: Option<&GicHypervisorInterface> = None;
@@ -17,15 +20,12 @@ pub const GICV_BASE: usize = 0x08040000;
 
 
 // GICC BITS
-pub const GICC_CTLR_EN_BIT: usize = 0x1;
-pub const GICC_CTLR_EOIMODENS_BIT: usize = 1 << 9;
+// pub const GICC_CTLR_EN_BIT: usize = 0x1;
+// pub const GICC_CTLR_EOIMODENS_BIT: usize = 1 << 9;
+// pub static GIC_LRS_NUM: Mutex<usize> = Mutex::new(0);
 
-pub static GIC_LRS_NUM: Mutex<usize> = Mutex::new(0);
 
-
-#[repr(C)]
-#[derive(Debug, Clone)]
-pub struct GicState {
+#[repr(C)] #[derive(Debug, Clone)] pub struct GicState {
     pub saved_hcr: u32,
     saved_eisr: [u32; GIC_LIST_REGS_NUM / 32],
     saved_elrsr: [u32; GIC_LIST_REGS_NUM / 32],

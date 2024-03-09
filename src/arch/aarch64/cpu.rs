@@ -62,18 +62,18 @@ impl <H: HyperCraftHalTrait> PerCpu<H> {
         PER_CPU_BASE.call_once(|| pcpu_pages);
         
         for cpu_id in 0..cpu_nums {
-            let stack_top_addr = if cpu_id == boot_id {
-                let boot_stack_top = Self::boot_cpu_stack()?;  // 0
-                debug!("boot_stack_top: {:#x}", boot_stack_top);
-                boot_stack_top
+            let stack_top_addr ;
+            if cpu_id == boot_id {
+                stack_top_addr = Self::boot_cpu_stack()?;  // 0
+                debug!("boot_stack_top: {:#x}", stack_top_addr);
             } else {
-                H::alloc_pages((stack_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K).ok_or(HyperError::NoMemory)?
+                stack_top_addr = H::alloc_pages((stack_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K).ok_or(HyperError::NoMemory)?;
+                debug!("boot_stack_top: {:#x}", stack_top_addr);
             };
             let pcpu: PerCpu<H> = Self::new(cpu_id, stack_top_addr);
             let ptr = Self::ptr_for_cpu(cpu_id);
             // Safety: ptr is guaranteed to be properly aligned and point to valid memory owned by
-            // PerCpu. No other CPUs are alive at this point, so it cannot be concurrently modified
-            // either.
+            // PerCpu. No other CPUs are alive at this point, so it cannot be concurrently modified either.
             unsafe { core::ptr::write(ptr as *mut PerCpu<H>, pcpu) };
         }
 

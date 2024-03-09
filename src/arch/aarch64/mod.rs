@@ -23,8 +23,7 @@ type ContextFrame = crate::arch::context_frame::Aarch64ContextFrame;
 
 /// Move to ARM register from system coprocessor register.
 /// MRS Xd, sysreg "Xd = sysreg"
-#[macro_export]
-macro_rules! mrs {
+#[macro_export] macro_rules! mrs {
     ($val: expr, $reg: expr, $asm_width:tt) => {
         unsafe {
             core::arch::asm!(concat!("mrs {0:", $asm_width, "}, ", 
@@ -47,8 +46,7 @@ macro_rules! mrs {
 
 /// Move to system coprocessor register from ARM register.
 /// MSR sysreg, Xn "sysreg = Xn"
-#[macro_export]
-macro_rules! msr {
+#[macro_export] macro_rules! msr {
     ($reg: expr, $val: expr, $asm_width:tt) => {
         unsafe {
             core::arch::asm!( concat!("msr ", stringify!($reg), ", {0:", $asm_width, "}"), 

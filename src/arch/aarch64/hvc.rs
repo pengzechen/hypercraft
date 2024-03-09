@@ -10,14 +10,12 @@ pub const HVC_SYS: usize = 0;
 /// HVC SYS event
 pub const HVC_SYS_BOOT: usize = 0;
 
-#[repr(C)]
-pub struct HvcDefaultMsg {
+#[repr(C)] pub struct HvcDefaultMsg {
     pub fid: usize,
     pub event: usize,
 }
 
-#[inline(never)]
-pub fn hvc_guest_handler(
+#[inline(never)] pub fn hvc_guest_handler(
     hvc_type: usize,
     event: usize,
     x0: usize,
@@ -148,8 +146,7 @@ unsafe fn init_hv_mmu(token: usize) {
 }
 */
 
-#[inline(never)]
-fn hvc_call(
+#[inline(never)] fn hvc_call(
     x0: usize, 
     x1: usize, 
     x2: usize, 

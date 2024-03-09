@@ -1,9 +1,11 @@
-use page_table::{PageTable64, PagingMetaData};
+use page_table::{
+    PageTable64, 
+    PagingMetaData
+};
 use page_table_entry::aarch64::A64PTE;
 
 /// Metadata of AArch64 hypervisor page tables (ipa to hpa).
-#[derive(Copy, Clone)]
-pub struct A64HVPagingMetaData;
+#[derive(Copy, Clone)] pub struct A64HVPagingMetaData;
 
 impl PagingMetaData for A64HVPagingMetaData {
     const LEVELS: usize = 3;

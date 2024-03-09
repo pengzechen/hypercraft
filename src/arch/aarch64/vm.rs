@@ -19,12 +19,7 @@ pub struct VM<H: HyperCraftHalTrait, G: GuestPageTableTrait> {
 impl <H: HyperCraftHalTrait, G: GuestPageTableTrait> VM<H, G> {
     /// Create a new VM
     pub fn new(vcpus: VmCpus<H>, gpt: G, id: usize)-> HyperResult<Self> {
-        Ok(Self { 
-                vcpus: vcpus, 
-                gpt: gpt, 
-                vm_id: id
-            }
-        )
+        Ok(Self { vcpus: vcpus, gpt: gpt, vm_id: id })
     }
 
     /// Init VM vcpu by vcpu id. Set kernel entry point.
