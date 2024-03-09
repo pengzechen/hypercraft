@@ -1,17 +1,17 @@
 use bit_field::BitField;
 use core::marker::PhantomData;
 
-use crate::{HyperCraftHal, HostPhysAddr, GuestPhysAddr};
+use crate::{HyperCraftHalTrait, HostPhysAddr, GuestPhysAddr};
 use crate::{HyperResult, HyperError};
 use crate::arch::memory::PhysFrame;
 
 /// VMCS/VMXON region in 4K size. (SDM Vol. 3C, Section 24.2)
 #[derive(Debug)]
-pub struct VmxRegion<H: HyperCraftHal> {
+pub struct VmxRegion<H: HyperCraftHalTrait> {
     frame: PhysFrame<H>,
 }
 
-impl<H: HyperCraftHal> VmxRegion<H> {
+impl<H: HyperCraftHalTrait> VmxRegion<H> {
     pub const unsafe fn uninit() -> Self {
         Self {
             frame: PhysFrame::uninit(),
@@ -35,11 +35,11 @@ impl<H: HyperCraftHal> VmxRegion<H> {
 
 
 #[derive(Debug)]
-pub struct MsrBitmap<H: HyperCraftHal> {
+pub struct MsrBitmap<H: HyperCraftHalTrait> {
     frame: PhysFrame<H>,
 }
 
-impl<H: HyperCraftHal> MsrBitmap<H> {
+impl<H: HyperCraftHalTrait> MsrBitmap<H> {
     pub fn passthrough_all() -> HyperResult<Self> {
         Ok(Self {
             frame: PhysFrame::alloc_zero()?,

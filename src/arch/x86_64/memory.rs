@@ -1,7 +1,7 @@
 use bitflags;
 use core::marker::PhantomData;
 
-use crate::{HyperCraftHal, HostPhysAddr, GuestPhysAddr};
+use crate::{HyperCraftHalTrait, HostPhysAddr, GuestPhysAddr};
 use crate::{HyperResult, HyperError};
 
 use page_table::MappingFlags;
@@ -18,12 +18,12 @@ pub struct NestedPageFaultInfo {
 /// A 4K-sized contiguous physical memory page, it will deallocate the page
 /// automatically on drop.
 #[derive(Debug)]
-pub struct PhysFrame<H: HyperCraftHal> {
+pub struct PhysFrame<H: HyperCraftHalTrait> {
     start_paddr: HostPhysAddr,
     _phantom: PhantomData<H>,
 }
 
-impl<H: HyperCraftHal> PhysFrame<H> {
+impl<H: HyperCraftHalTrait> PhysFrame<H> {
     pub fn alloc() -> HyperResult<Self> {
         let start_paddr = H::alloc_page()
             .map(|va| H::virt_to_phys(va))
@@ -62,7 +62,7 @@ impl<H: HyperCraftHal> PhysFrame<H> {
     }
 }
 
-impl<H: HyperCraftHal> Drop for PhysFrame<H> {
+impl<H: HyperCraftHalTrait> Drop for PhysFrame<H> {
     fn drop(&mut self) {
         if self.start_paddr > 0 {
             trace!("dropping physframe {:#018x}", self.start_paddr);

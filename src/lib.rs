@@ -30,29 +30,21 @@ mod memory;
 mod traits;
 mod vcpus;
 
-/// HyperCraft Result Define.
-pub type HyperResult<T = ()> = Result<T, HyperError>;
-
-
+pub use vcpus::VmCpus;
+pub use hal::HyperCraftHalTrait;
 
 #[cfg(not(target_arch = "aarch64"))] pub use arch::{
     init_hv_runtime, GprIndex, HyperCallMsg, VmExitInfo,
 };
 
-
 pub use arch::{
     NestedPageTable, PerCpu, VCpu, VM,
 };
 
-pub use hal::HyperCraftHal;
 pub use memory::{
     GuestPageNum, GuestPageTableTrait, GuestPhysAddr, 
     GuestVirtAddr, HostPageNum, HostPhysAddr, HostVirtAddr,
 };
-pub use vcpus::VmCpus;
-
-
-
 
 /// The error type for hypervisor operation failures.
 #[derive(Debug, PartialEq)]
@@ -82,3 +74,6 @@ pub enum HyperError {
     /// Disabled.
     Disabled,
 }
+
+/// HyperCraft Result Define.
+pub type HyperResult<T = ()> = Result<T, HyperError>;

@@ -17,11 +17,11 @@ use super::VmxPerCpuState;
 use super::definitions::VmxExitReason;
 use crate::arch::{msr::Msr, memory::NestedPageFaultInfo, regs::GeneralRegisters};
 use crate::arch::lapic::ApicTimer;
-use crate::{GuestPhysAddr, HostPhysAddr, HyperCraftHal, HyperResult};
+use crate::{GuestPhysAddr, HostPhysAddr, HyperCraftHalTrait, HyperResult};
 
 /// A virtual CPU within a guest.
 #[repr(C)]
-pub struct VmxVcpu<H: HyperCraftHal> {
+pub struct VmxVcpu<H: HyperCraftHalTrait> {
     guest_regs: GeneralRegisters,
     host_stack_top: u64,
     vmcs: VmxRegion<H>,
@@ -30,7 +30,7 @@ pub struct VmxVcpu<H: HyperCraftHal> {
     pending_events: VecDeque<(u8, Option<u32>)>,
 }
 
-impl<H: HyperCraftHal> VmxVcpu<H> {
+impl<H: HyperCraftHalTrait> VmxVcpu<H> {
     pub(crate) fn new(
         percpu: &VmxPerCpuState<H>,
         entry: GuestPhysAddr,
@@ -131,7 +131,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
 }
 
 // Implementation of private methods
-impl<H: HyperCraftHal> VmxVcpu<H> {
+impl<H: HyperCraftHalTrait> VmxVcpu<H> {
     fn setup_msr_bitmap(&mut self) -> HyperResult {
         // Intercept IA32_APIC_BASE MSR accesses
         let msr = x86::msr::IA32_APIC_BASE;
@@ -428,7 +428,7 @@ impl<H: HyperCraftHal> VmxVcpu<H> {
     }
 }
 
-impl<H: HyperCraftHal> Drop for VmxVcpu<H> {
+impl<H: HyperCraftHalTrait> Drop for VmxVcpu<H> {
     fn drop(&mut self) {
         unsafe { vmx::vmclear(self.vmcs.phys_addr() as u64).unwrap() };
         info!("[HV] dropped VmxVcpu(vmcs: {:#x})", self.vmcs.phys_addr());
@@ -451,7 +451,7 @@ fn get_tr_base(tr: SegmentSelector, gdt: &DescriptorTablePointer<u64>) -> u64 {
     }
 }
 
-impl<H: HyperCraftHal> Debug for VmxVcpu<H> {
+impl<H: HyperCraftHalTrait> Debug for VmxVcpu<H> {
     fn fmt(&self, f: &mut Formatter) -> Result {
         (|| -> HyperResult<Result> {
             Ok(f.debug_struct("VmxVcpu")

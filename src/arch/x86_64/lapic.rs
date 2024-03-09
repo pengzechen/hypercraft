@@ -1,7 +1,7 @@
 use bit_field::BitField;
 use core::marker::PhantomData;
 
-use crate::{HyperCraftHal, HyperResult, HyperError};
+use crate::{HyperCraftHalTrait, HyperResult, HyperError};
 
 const APIC_FREQ_MHZ: u64 = 1000; // 1000 MHz
 const APIC_CYCLE_NANOS: u64 = 1000 / APIC_FREQ_MHZ;
@@ -20,7 +20,7 @@ pub enum TimerMode {
 }
 
 /// A virtual local APIC timer. (SDM Vol. 3C, Section 10.5.4)
-pub struct ApicTimer<H: HyperCraftHal> {
+pub struct ApicTimer<H: HyperCraftHalTrait> {
     lvt_timer_bits: u32,
     divide_shift: u8,
     initial_count: u32,
@@ -29,7 +29,7 @@ pub struct ApicTimer<H: HyperCraftHal> {
     _phantom: PhantomData<H>,
 }
 
-impl<H: HyperCraftHal> ApicTimer<H> {
+impl<H: HyperCraftHalTrait> ApicTimer<H> {
     pub(crate) const fn new() -> Self {
         Self {
             lvt_timer_bits: 0x1_0000, // masked

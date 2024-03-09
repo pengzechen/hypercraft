@@ -1,4 +1,9 @@
-use crate::{HyperCraftHal, HyperResult};
+
+use crate::{
+    HyperCraftHalTrait, 
+    HyperResult
+};
+
 use page_table_entry::MappingFlags;
 
 /// Guest physical address.
@@ -19,9 +24,7 @@ pub const PAGE_SIZE_4K: usize = 0x1000;
 /// Guest page table trait.
 pub trait GuestPageTableTrait {
     /// Create a new guest page table.
-    fn new() -> HyperResult<Self>
-    where
-        Self: Sized;
+    fn new() -> HyperResult<Self> where Self: Sized;
 
     /// Map a guest physical frame starts from `gpa` to the host physical
     /// frame starts from of `hpa` with `flags`.
@@ -50,4 +53,5 @@ pub trait GuestPageTableTrait {
 
     /// Get guest page table token.
     fn token(&self) -> usize;
+
 }

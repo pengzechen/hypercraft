@@ -1,5 +1,5 @@
 use crate::{
-    HyperCraftHal, 
+    HyperCraftHalTrait, 
     GuestPageTableTrait, 
     VmCpus, 
     HyperResult
@@ -7,7 +7,7 @@ use crate::{
 
 /// The guest VM
 #[repr(align(4096))]
-pub struct VM<H: HyperCraftHal, G: GuestPageTableTrait> {
+pub struct VM<H: HyperCraftHalTrait, G: GuestPageTableTrait> {
     /// The vcpus belong to VM
     vcpus: VmCpus<H>,
     /// The guest page table of VM
@@ -16,7 +16,7 @@ pub struct VM<H: HyperCraftHal, G: GuestPageTableTrait> {
     vm_id: usize,
 }
 
-impl <H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
+impl <H: HyperCraftHalTrait, G: GuestPageTableTrait> VM<H, G> {
     /// Create a new VM
     pub fn new(vcpus: VmCpus<H>, gpt: G, id: usize)-> HyperResult<Self> {
         Ok(Self { 

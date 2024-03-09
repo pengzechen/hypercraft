@@ -6,7 +6,7 @@ use crate::arch::{
 
 use crate::{
     GuestPageTableTrait, 
-    HyperCraftHal, 
+    HyperCraftHalTrait, 
     HyperError, 
     HyperResult,
 };
@@ -15,19 +15,16 @@ use alloc::boxed::Box;
 use arrayvec::ArrayVec;
 use spin::Once;
 
-
-
 pub const MAX_CPUS: usize = 8; /// The maximum number of CPUs we can support.
 pub const VM_CPUS_MAX: usize = MAX_CPUS;
 
-
 #[derive(Default)] /// The set of vCPUs in a VM.
-pub struct VmCpus<H: HyperCraftHal> {  
+pub struct VmCpus<H: HyperCraftHalTrait> {  
     inner: [Once<VCpu<H>>; VM_CPUS_MAX],
     marker: core::marker::PhantomData<H>,
 }
 
-impl<H: HyperCraftHal> VmCpus<H> {
+impl<H: HyperCraftHalTrait> VmCpus<H> {
     /// Creates a new vCPU tracking structure.
     pub fn new() -> Self {
         Self {
@@ -58,5 +55,5 @@ impl<H: HyperCraftHal> VmCpus<H> {
 }
 
 // Safety: Each VCpu is wrapped with a Mutex to provide safe concurrent access to VCpu.
-unsafe impl<H: HyperCraftHal> Sync for VmCpus<H> {}
-unsafe impl<H: HyperCraftHal> Send for VmCpus<H> {}
+unsafe impl<H: HyperCraftHalTrait> Sync for VmCpus<H> {}
+unsafe impl<H: HyperCraftHalTrait> Send for VmCpus<H> {}

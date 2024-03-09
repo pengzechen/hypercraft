@@ -1,16 +1,16 @@
-use crate::{HyperCraftHal, HostPhysAddr, GuestPhysAddr};
+use crate::{HyperCraftHalTrait, HostPhysAddr, GuestPhysAddr};
 use crate::{HyperResult, HyperError};
 use crate::arch::vmx::VmxPerCpuState;
 
 use super::VCpu;
 
 /// Host per-CPU states to run the guest. All methods must be called on the corresponding CPU.
-pub struct PerCpu<H: HyperCraftHal> {
+pub struct PerCpu<H: HyperCraftHalTrait> {
     cpu_id: usize,
     arch: VmxPerCpuState<H>,
 }
 
-impl<H: HyperCraftHal> PerCpu<H> {
+impl<H: HyperCraftHalTrait> PerCpu<H> {
     /// Create an uninitialized instance.
     pub fn new(cpu_id: usize) -> Self {
         Self {
@@ -65,7 +65,7 @@ impl<H: HyperCraftHal> PerCpu<H> {
     }
 }
 
-impl<H: HyperCraftHal> Drop for PerCpu<H> {
+impl<H: HyperCraftHalTrait> Drop for PerCpu<H> {
     fn drop(&mut self) {
         if self.is_enabled() {
             self.hardware_disable().unwrap();

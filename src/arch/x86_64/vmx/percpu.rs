@@ -1,18 +1,18 @@
 use x86::{bits64::vmx, vmx::VmFail};
 use x86_64::registers::control::{Cr0, Cr4, Cr4Flags};
 
-use crate::{HyperCraftHal, HyperError, HyperResult};
+use crate::{HyperCraftHalTrait, HyperError, HyperResult};
 use crate::arch::msr::{Msr, MsrReadWrite, VmxBasic, FeatureControl, FeatureControlFlags};
 use super::detect::has_hardware_support;
 use super::region::VmxRegion;
 
 /// State per vmx physical cpu.
-pub struct VmxPerCpuState<H: HyperCraftHal> {
+pub struct VmxPerCpuState<H: HyperCraftHalTrait> {
     pub(super) vmcs_revision_id: u32,
     vmx_region: VmxRegion<H>,
 }
 
-impl<H: HyperCraftHal> VmxPerCpuState<H> {
+impl<H: HyperCraftHalTrait> VmxPerCpuState<H> {
     pub const fn new() -> Self {
         Self {
             vmcs_revision_id: 0,

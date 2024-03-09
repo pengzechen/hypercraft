@@ -1,26 +1,34 @@
-use alloc::collections::VecDeque;
+
 use core::arch::asm;
-
-use spin::{Mutex, Once};
-
-use crate::{HyperCraftHal, HyperResult, HyperError, HostPhysAddr, HostVirtAddr, GuestPhysAddr};
+use spin::{
+    Mutex, 
+    Once
+};
+use crate::{
+    HyperCraftHalTrait, 
+    HyperResult, 
+    HyperError, 
+    HostPhysAddr, 
+    HostVirtAddr, 
+    GuestPhysAddr
+};
+use alloc::collections::VecDeque;
 use crate::arch::vcpu::VCpu;
 use crate::arch::ContextFrame;
 use crate::traits::ContextFrameTrait;
 
-/// need to move to a suitable file?
-const PAGE_SIZE_4K: usize = 0x1000;
+pub const CPU_MASTER:       usize = 0;
+pub const CONTEXT_GPR_NUM:  usize = 31;
+pub const PTE_PER_PAGE:     usize = 512;
 
-pub const CPU_MASTER: usize = 0;
+const PAGE_SIZE_4K: usize = 0x1000;  /// need to move to a suitable file?
 pub const CPU_STACK_SIZE: usize = PAGE_SIZE_4K * 128;
-pub const CONTEXT_GPR_NUM: usize = 31;
-pub const PTE_PER_PAGE: usize = 512;
 
 /// Per-CPU data. A pointer to this struct is loaded into TP when a CPU starts. This structure
 /// sits at the top of a secondary CPU's stack.
 #[repr(C)]
 #[repr(align(4096))]
-pub struct PerCpu<H:HyperCraftHal>{   //stack_top_addr has no use yet?
+pub struct PerCpu<H:HyperCraftHalTrait>{   //stack_top_addr has no use yet?
     /// per cpu id
     pub cpu_id: usize,
     stack_top_addr: HostVirtAddr,
@@ -32,7 +40,7 @@ pub struct PerCpu<H:HyperCraftHal>{   //stack_top_addr has no use yet?
 /// The base address of the per-CPU memory region.
 static PER_CPU_BASE: Once<HostPhysAddr> = Once::new();
 
-impl <H: HyperCraftHal> PerCpu<H> {
+impl <H: HyperCraftHalTrait> PerCpu<H> {
     const fn new(cpu_id: usize, stack_top_addr: HostVirtAddr) -> Self {
         Self {
             cpu_id: cpu_id,
@@ -48,18 +56,18 @@ impl <H: HyperCraftHal> PerCpu<H> {
         let cpu_nums: usize = 1;
         let pcpu_size = core::mem::size_of::<PerCpu<H>>() * cpu_nums;
         debug!("pcpu_size: {:#x}", pcpu_size);
-        let pcpu_pages = H::alloc_pages((pcpu_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K)
-            .ok_or(HyperError::NoMemory)?;
+
+        let pcpu_pages = H::alloc_pages((pcpu_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K).ok_or(HyperError::NoMemory)?;
         debug!("pcpu_pages: {:#x}", pcpu_pages);
         PER_CPU_BASE.call_once(|| pcpu_pages);
+        
         for cpu_id in 0..cpu_nums {
             let stack_top_addr = if cpu_id == boot_id {
-                let boot_stack_top = Self::boot_cpu_stack()?;
+                let boot_stack_top = Self::boot_cpu_stack()?;  // 0
                 debug!("boot_stack_top: {:#x}", boot_stack_top);
                 boot_stack_top
             } else {
-                H::alloc_pages((stack_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K)
-                    .ok_or(HyperError::NoMemory)?
+                H::alloc_pages((stack_size + PAGE_SIZE_4K - 1) / PAGE_SIZE_4K).ok_or(HyperError::NoMemory)?
             };
             let pcpu: PerCpu<H> = Self::new(cpu_id, stack_top_addr);
             let ptr = Self::ptr_for_cpu(cpu_id);
@@ -74,6 +82,8 @@ impl <H: HyperCraftHal> PerCpu<H> {
 
         Ok(())
     }
+
+
 
     /// Initializes the TP pointer to point to PerCpu data.
     pub fn setup_this_cpu(cpu_id: usize) -> HyperResult<()> {
@@ -110,6 +120,8 @@ impl <H: HyperCraftHal> PerCpu<H> {
         result
     }
 
+    
+    
     /// Get stack top addr.
     fn stack_top_addr(&self) -> HostVirtAddr {
         self.stack_top_addr

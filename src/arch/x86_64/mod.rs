@@ -10,7 +10,7 @@ mod msr;
 mod vmx;
 mod percpu;
 
-use crate::{GuestPageTableTrait, HyperCraftHal};
+use crate::{GuestPageTableTrait, HyperCraftHalTrait};
 use page_table::PagingIf;
 
 /// Initialize the hypervisor runtime.
@@ -31,7 +31,7 @@ pub use vmx::{VmxExitReason, VmxExitInfo};
 ////// Following are things to be implemented
 
 
-impl<H: HyperCraftHal> VCpu<H> {
+impl<H: HyperCraftHalTrait> VCpu<H> {
     /// Get the vcpu id.
     pub fn vcpu_id(&self) -> usize {
         todo!()
@@ -39,7 +39,7 @@ impl<H: HyperCraftHal> VCpu<H> {
 }
 
 /// VM define.
-pub struct VM<H: HyperCraftHal> {
+pub struct VM<H: HyperCraftHalTrait> {
     _marker: core::marker::PhantomData<H>,
 }
 
