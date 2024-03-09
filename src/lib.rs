@@ -16,20 +16,14 @@
 
 #![feature(naked_functions, asm_const, negative_impls, stdsimd, inline_const, concat_idents)]
 
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate alloc;
-
-#[cfg(target_arch = "aarch64")]
-#[path = "arch/aarch64/mod.rs"]
-mod arch;
-#[cfg(target_arch = "riscv64")]
-#[path = "arch/riscv/mod.rs"]
-mod arch;
-#[cfg(target_arch = "x86_64")]
-#[path = "arch/x86_64/mod.rs"]
-mod arch;
+#[macro_use]  extern crate log;
+#[macro_use]  extern crate alloc;
+ 
+#[cfg(target_arch = "aarch64")] #[path = "arch/aarch64/mod.rs"] mod arch;
+#[cfg(target_arch = "riscv64")] #[path = "arch/riscv/mod.rs"]   mod arch;
+#[cfg(target_arch = "x86_64")]  #[path = "arch/x86_64/mod.rs"]  mod arch;
+#[cfg(target_arch = "aarch64")] pub use arch::lower_aarch64_synchronous;
+#[cfg(target_arch = "x86_64")]  pub use arch::{VmxExitReason, VmxExitInfo};
 
 mod hal;
 mod memory;
@@ -40,8 +34,8 @@ mod vcpus;
 pub type HyperResult<T = ()> = Result<T, HyperError>;
 
 
-#[cfg(not(target_arch = "aarch64"))]
-pub use arch::{
+
+#[cfg(not(target_arch = "aarch64"))] pub use arch::{
     init_hv_runtime, GprIndex, HyperCallMsg, VmExitInfo,
 };
 
@@ -52,16 +46,13 @@ pub use arch::{
 
 pub use hal::HyperCraftHal;
 pub use memory::{
-    GuestPageNum, GuestPageTableTrait, GuestPhysAddr, GuestVirtAddr, HostPageNum, HostPhysAddr,
-    HostVirtAddr,
+    GuestPageNum, GuestPageTableTrait, GuestPhysAddr, 
+    GuestVirtAddr, HostPageNum, HostPhysAddr, HostVirtAddr,
 };
 pub use vcpus::VmCpus;
 
-#[cfg(target_arch = "aarch64")]
-pub use arch::lower_aarch64_synchronous;
 
-#[cfg(target_arch = "x86_64")]
-pub use arch::{VmxExitReason, VmxExitInfo};
+
 
 /// The error type for hypervisor operation failures.
 #[derive(Debug, PartialEq)]
