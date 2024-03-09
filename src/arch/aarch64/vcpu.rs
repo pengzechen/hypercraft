@@ -15,7 +15,6 @@ use core::arch::global_asm;
 use spin::Mutex;
 use core::marker::PhantomData;
 
-// type ContextFrame = crate::arch::contextFrame::Aarch64ContextFrame;
 use cortex_a::registers::*;
 use tock_registers::interfaces::*;
 

@@ -1,35 +1,16 @@
 use core::arch::asm;
 use core::arch::global_asm;
 use core::fmt::Formatter;
-
 use cortex_a::registers::*;
-
 use crate::{msr, mrs};
 use crate::arch::gic::GicState;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct Aarch64ContextFrame {
+
+#[repr(C)] #[derive(Copy, Clone, Debug)] pub struct Aarch64ContextFrame {
     pub gpr: [u64; 31],
     pub sp: u64,
     pub elr: u64,
     pub spsr: u64,
-}
-
-impl core::fmt::Display for Aarch64ContextFrame {
-
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
-        for i in 0..31 {
-            write!(f, "x{:02}: {:016x}   ", i, self.gpr[i])?;
-            if (i + 1) % 2 == 0 {
-                write!(f, "\n")?;
-            }
-        }
-        writeln!(f, "spsr:{:016x}", self.spsr)?;
-        write!(f, "elr: {:016x}", self.elr)?;
-        writeln!(f, "   sp:  {:016x}", self.sp)?;
-        Ok(())
-    }
 }
 
 impl crate::traits::ContextFrameTrait for Aarch64ContextFrame {
@@ -66,16 +47,32 @@ impl crate::traits::ContextFrameTrait for Aarch64ContextFrame {
         self.sp = sp as u64;
     }
 
-    fn set_argument(&mut self, arg: usize) {
-        self.gpr[0] = arg as u64;
+    fn gpr(&self, index: usize) -> usize {
+        self.gpr[index] as usize
     }
-
+    
     fn set_gpr(&mut self, index: usize, val: usize) {
         self.gpr[index] = val as u64;
     }
+    
+    fn set_argument(&mut self, arg: usize) {
+        self.gpr[0] = arg as u64;
+    }
+}
 
-    fn gpr(&self, index: usize) -> usize {
-        self.gpr[index] as usize
+impl core::fmt::Display for Aarch64ContextFrame {
+
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
+        for i in 0..31 {
+            write!(f, "x{:02}: {:016x}   ", i, self.gpr[i])?;
+            if (i + 1) % 2 == 0 {
+                write!(f, "\n")?;
+            }
+        }
+        writeln!(f, "spsr:{:016x}", self.spsr)?;
+        write!(f, "elr: {:016x}", self.elr)?;
+        writeln!(f, "   sp:  {:016x}", self.sp)?;
+        Ok(())
     }
 }
 
@@ -95,10 +92,8 @@ impl Aarch64ContextFrame {
     }
 }
 
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Clone)]
-pub struct VmContext {
+
+#[repr(C)]#[repr(align(16))]#[derive(Debug, Clone)]pub struct VmContext {
     // generic timer
     pub cntvoff_el2: u64,
     cntp_cval_el0: u64,
@@ -330,11 +325,7 @@ impl VmContext {
         msr!(CNTVOFF_EL2, self.cntvoff_el2);
     }
 
-    pub fn gic_save_state(&mut self) {
-        self.gic_state.save_state();
-    }
+    pub fn gic_save_state(&mut self) { self.gic_state.save_state(); }
 
-    pub fn gic_restore_state(&self) {
-        self.gic_state.restore_state();
-    }
+    pub fn gic_restore_state(&self) { self.gic_state.restore_state(); }
 }

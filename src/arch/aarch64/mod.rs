@@ -10,12 +10,12 @@ mod gic;
 mod ept;
 
 // pub use gic::{GICC, GICD, GICH, GICD_BASE};
+// pub use config::*;
+
 pub use ept::NestedPageTable;
 pub use vcpu::VCpu;
 pub use vm::VM;
 pub use cpu::PerCpu;
-// pub use config::*;
-
 pub use page_table::PageSize;
 pub use exception::lower_aarch64_synchronous;
 
