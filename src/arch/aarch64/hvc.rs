@@ -35,10 +35,7 @@ pub const HVC_SYS_BOOT: usize = 0;
     }
 }
 
-pub fn run_guest_by_trap2el2(token: usize, regs_addr: usize) -> usize {
-    // mode is in x7. hvc_type: HVC_SYS; event: HVC_SYS_BOOT
-    hvc_call(token, regs_addr, 0, 0, 0, 0, 0, 0)
-}
+
 
 #[inline(never)]
 fn hvc_sys_handler(event: usize, root_paddr: usize, vm_ctx_addr: usize) -> Result<usize, ()> {
@@ -145,6 +142,11 @@ unsafe fn init_hv_mmu(token: usize) {
 
 }
 */
+
+pub fn run_guest_by_trap2el2(token: usize, regs_addr: usize) -> usize {
+    // mode is in x7. hvc_type: HVC_SYS; event: HVC_SYS_BOOT
+    hvc_call(token, regs_addr, 0, 0, 0, 0, 0, 0)
+}
 
 #[inline(never)] fn hvc_call(
     x0: usize, 

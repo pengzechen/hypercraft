@@ -60,7 +60,7 @@ fn translate_far_to_hpfar(far: usize) -> Result<usize, ()> {
 
     match exception_class() {
         0x24 => {
-            // info!("Core[{}] data_abort_handler", cpu_id());
+            info!("Core data_abort_handler");
             data_abort_handler(ctx);
         }
         0x16 => {
