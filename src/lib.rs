@@ -21,16 +21,10 @@ extern crate log;
 #[macro_use]
 extern crate alloc;
 
-#[cfg(target_arch = "aarch64")]
 #[path = "arch/aarch64/mod.rs"]
 /// Aarch64 arch code.
 pub mod arch;
-#[cfg(target_arch = "riscv64")]
-#[path = "arch/riscv/mod.rs"]
-mod arch;
-#[cfg(target_arch = "x86_64")]
-#[path = "arch/x86_64/mod.rs"]
-mod arch;
+
 
 mod hal;
 mod memory;
@@ -39,12 +33,6 @@ mod vcpus;
 
 /// HyperCraft Result Define.
 pub type HyperResult<T = ()> = Result<T, HyperError>;
-
-
-#[cfg(not(target_arch = "aarch64"))]
-pub use arch::{
-    init_hv_runtime, GprIndex, HyperCallMsg, VmExitInfo,
-};
 
 
 pub use arch::{
@@ -58,11 +46,7 @@ pub use memory::{
 };
 pub use vcpus::VmCpus;
 
-#[cfg(target_arch = "aarch64")]
 pub use arch::{VcpusArray, IrqState};
-
-#[cfg(target_arch = "x86_64")]
-pub use arch::{VmxExitReason, VmxExitInfo};
 
 /// The error type for hypervisor operation failures.
 #[derive(Debug, PartialEq)]
