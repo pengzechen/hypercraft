@@ -68,6 +68,7 @@ pub fn hvc_guest_handler(
 /// # Returns
 ///
 /// The result of the hvc_call function.
+
 pub fn run_guest_by_trap2el2(token: usize, regs_addr: usize) -> usize {
     // mode is in x7. hvc_type: HVC_SYS; event: HVC_SYS_BOOT
     hvc_call(token, regs_addr, 0, 0, 0, 0, 0, 0)
@@ -155,6 +156,7 @@ fn init_hv(root_paddr: usize, vm_ctx_addr: usize) {
    
 }
 */
+
 #[inline(never)]
 fn hvc_call(
     x0: usize, 
@@ -169,6 +171,7 @@ fn hvc_call(
     let r0;
     #[cfg(target_arch = "aarch64")]
     unsafe {
+        
         core::arch::asm!(
             "hvc #0",
             inout("x0") x0 => r0,
