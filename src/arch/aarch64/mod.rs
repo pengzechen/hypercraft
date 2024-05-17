@@ -2,6 +2,7 @@ mod context_frame;
 mod cpu;
 mod vm;
 mod gic;
+mod gicv3;
 mod ept;
 mod vcpus_array;
 
@@ -13,6 +14,8 @@ pub mod vcpu;
 pub mod utils;
 /// vitual gic
 pub mod vgic;
+/// virtual gicv3
+pub mod vgicv3;
 /// virtual uart
 pub mod vuart;
 
