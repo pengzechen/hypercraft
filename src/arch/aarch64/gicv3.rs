@@ -9,7 +9,7 @@ use arm_gicv3::regs::{
 };
 
 use arm_gicv3::{
-    GIC_PRIVINT_NUM, GIC_LIST_REGS_NUM, GICH_VTR_PRIBITS_OFF, GICH_VTR_PRIBITS_LEN, 
+    GIC_PRIVATE_INT_NUM, GIC_LIST_REGS_NUM, GICH_VTR_PRIBITS_OFF, GICH_VTR_PRIBITS_LEN, 
     GICC_CTLR_EOIMODE_BIT, GICC_IGRPEN_EL1_ENB_BIT, GICC_SRE_EL2_ENABLE,
     GICH, GICR
 };
@@ -63,7 +63,7 @@ pub fn gic_set_state(int_id: usize, state: usize, gicr_id: u32) {
     pub rpr: u32,
     pub hppir: u32,
     pub priv_isenabler: u32,
-    pub priv_ipriorityr: [u32; GIC_PRIVINT_NUM / 4],
+    pub priv_ipriorityr: [u32; GIC_PRIVATE_INT_NUM / 4],
     pub hcr: usize,
     pub lr: [usize; GIC_LIST_REGS_NUM],
     pub apr0: [u32; 4],
@@ -88,7 +88,7 @@ impl GicState {
             hppir: 0,
             // priv_isenabler: GICR[current_cpu().id].ISENABLER0.get(), pzc change 
             priv_isenabler: 0,
-            priv_ipriorityr: [u32::MAX; GIC_PRIVINT_NUM / 4],
+            priv_ipriorityr: [u32::MAX; GIC_PRIVATE_INT_NUM / 4],
             hcr: 0b101,
             lr: [0; GIC_LIST_REGS_NUM],
             vmcr: 0,

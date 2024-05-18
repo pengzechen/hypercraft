@@ -262,7 +262,7 @@ impl <H: HyperCraftHal, G: GuestPageTableTrait> VgicIntInner <H, G>{
             owner: None,
             route: GICD_IROUTER_INV as u64,
             phys: VgicIntPhys::Route(GICD_IROUTER_INV as u64),
-            id: (id + GIC_PRIVINT_NUM) as u16,
+            id: (id + GIC_PRIVATE_INT_NUM) as u16,
             hw: false,
             in_lr: false,
             lr: 0,
