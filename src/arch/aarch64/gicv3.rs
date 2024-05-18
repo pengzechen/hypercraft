@@ -75,8 +75,8 @@ pub fn gic_set_state(int_id: usize, state: usize, gicr_id: u32) {
 }
 
 /*  need to set priv_isenabler */
-impl Default for GicState {
-    fn default() -> Self {
+impl GicState {
+    pub fn default() -> Self {
         let nr_prio = (((ICH_VTR_EL2::read() >> GICH_VTR_PRIBITS_OFF) & ((1 << GICH_VTR_PRIBITS_LEN) - 1)) + 1) as u32;
         GicState {
             ctlr: GICC_CTLR_EOIMODE_BIT as u32,
@@ -98,6 +98,10 @@ impl Default for GicState {
             sre_el1: 0,
         }
     }
+
+    pub fn save_state(&mut self) {}
+
+    pub fn restore_state(&self) {}
 }
 
 trait InterruptContextTrait {
