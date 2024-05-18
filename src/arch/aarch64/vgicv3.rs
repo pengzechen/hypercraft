@@ -104,7 +104,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VgicInt<H, G> {
         vgic_int.owner = None;
     }
 
-    fn set_hw(&self, hw: bool) {
+    pub fn set_hw(&self, hw: bool) {
         let mut vgic_int = self.inner.lock();
         vgic_int.hw = hw;
     }
@@ -124,7 +124,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VgicInt<H, G> {
         vgic_int.in_lr
     }
 
-    fn route(&self) -> u64 {
+    pub fn route(&self) -> u64 {
         let vgic_int = self.inner.lock();
         vgic_int.route
     }
@@ -149,7 +149,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VgicInt<H, G> {
         }
     }
 
-    fn set_phys_route(&self, route: usize) {
+    pub fn set_phys_route(&self, route: usize) {
         let mut vgic_int = self.inner.lock();
         vgic_int.phys = VgicIntPhys::Route(route as u64);
     }
@@ -159,7 +159,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VgicInt<H, G> {
         vgic_int.phys = VgicIntPhys::Redist(redist as u64);
     }
 
-    fn set_route(&self, route: usize) {
+    pub fn set_route(&self, route: usize) {
         let mut vgic_int = self.inner.lock();
         vgic_int.route = route as u64;
     }
@@ -423,7 +423,7 @@ impl <H: HyperCraftHal, G: GuestPageTableTrait> VgicCpuPriv <H, G>{
         }
     }
 
-    fn new(typer: usize, cltr: usize, iidr: usize) -> VgicCpuPriv  <H, G> {
+    pub fn new(typer: usize, cltr: usize, iidr: usize) -> VgicCpuPriv  <H, G> {
         VgicCpuPriv {
             vigcr: Vgicr::new(typer, cltr, iidr),
             curr_lrs: [0; GIC_LIST_REGS_NUM],
@@ -528,7 +528,7 @@ impl <H: HyperCraftHal, G: GuestPageTableTrait> Vgic <H, G>{
     }
 
     /// Set vgicd ctlr
-    fn set_vgicd_ctlr(&self, ctlr: u32) {
+    pub fn set_vgicd_ctlr(&self, ctlr: u32) {
         let mut vgicd = self.vgicd.lock();
         vgicd.ctlr = ctlr;
     }
