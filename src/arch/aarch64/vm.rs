@@ -8,7 +8,12 @@ use crate::{GuestPageTableTrait, HyperCraftHal, HyperResult, VcpusArray, VmCpus}
 
 use super::emu::*;
 use super::utils::*;
-use super::vgic::*;
+
+#[cfg(not(feature = "gic_v3"))]
+use super::vgic::*;  
+#[cfg(feature = "gic_v3")]
+use super::vgicv3::*;
+
 use super::vuart::*;
 
 const VGIC_DEV_ID: usize = 0;
@@ -141,6 +146,11 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
         self.emu_devs.push(emu);
     }
 
+    pub fn emu_dev(&self, dev_id: usize) -> EmuDevs<H, G> {
+        // let vm_inner = self.inner.lock();
+        self.emu_devs[dev_id].clone()
+    }
+
     /// Get cpu number of the vm
     pub fn vcpu_num(&self) -> usize {
         return self.vcpus.length;
@@ -178,6 +188,11 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
         self.intc_dev_id = idx;
     }
 
+    pub fn intc_dev_id(&self) -> usize {
+        // let vm_inner = self.inner.lock();
+        self.intc_dev_id
+    }
+
      /// Change vcpu mask to pcpu mask
     pub fn vcpu_to_pcpu_mask(&self, mask: usize, len: usize) -> usize {
         let mut pmask = 0;
@@ -204,7 +219,7 @@ impl<H: HyperCraftHal, G: GuestPageTableTrait> VM<H, G> {
         return vmask;
     }
 
-    fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Option<usize> {
+    pub fn vcpuid_to_pcpuid(&self, vcpuid: usize) -> Option<usize> {
         // debug!("vcpuid_to_pcpuid, vcpuid: {}", vcpuid);
         if let Some(vcpu) = self.vcpus.get_vcpu(vcpuid) {
             return Some(vcpu.pcpu_id);

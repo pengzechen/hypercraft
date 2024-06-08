@@ -3,7 +3,12 @@ use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
 use spin::Mutex;
 
-use super::vgic::Vgic;
+
+#[cfg(not(feature = "gic_v3"))]
+use super::vgic::Vgic;  // temp use
+#[cfg(feature = "gic_v3")]
+use super::vgicv3::Vgic;
+
 use super::vuart::Vuart;
 use crate::{HyperCraftHal, GuestPageTableTrait};
 
@@ -61,8 +66,16 @@ pub struct EmuDevEntry {
 pub enum EmuDeviceType {
     /// console
     EmuDeviceTConsole = 0,
+
     /// GIC (interrupt controller)
     EmuDeviceTGicd = 1,
+    /// ICC
+    EmuDeviceTICCSRE = 9,
+    /// SGI
+    EmuDeviceTSGIR = 10,
+    /// GICR
+    EmuDeviceTGICR = 11,
+
     /// partial passthrough interrupt controller
     EmuDeviceTGPPT = 2,
     /// virtio block
@@ -79,6 +92,9 @@ impl Display for EmuDeviceType {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             EmuDeviceType::EmuDeviceTGicd => write!(f, "interrupt controller"),
+            EmuDeviceType::EmuDeviceTICCSRE => write!(f, "interrupt controller icc"),
+            EmuDeviceType::EmuDeviceTSGIR => write!(f, "interrupt controller sgi"),
+            EmuDeviceType::EmuDeviceTGICR => write!(f, "interrupt controller gicr"),
             EmuDeviceType::EmuDeviceTConsole => write!(f, "console"),
             EmuDeviceType::EmuDeviceTGPPT => write!(f, "partial passthrough interrupt controller"),
             EmuDeviceType::EmuDeviceTVirtioBlk => write!(f, "virtio block"),
@@ -94,6 +110,9 @@ impl EmuDeviceType {
     pub fn removable(&self) -> bool {
         match *self {
             EmuDeviceType::EmuDeviceTGicd
+            | EmuDeviceType::EmuDeviceTICCSRE
+            | EmuDeviceType::EmuDeviceTSGIR
+            | EmuDeviceType::EmuDeviceTGICR
             | EmuDeviceType::EmuDeviceTGPPT
             | EmuDeviceType::EmuDeviceTVirtioBlk
             | EmuDeviceType::EmuDeviceTVirtioNet
@@ -109,6 +128,11 @@ impl EmuDeviceType {
         match value {
             0 => EmuDeviceType::EmuDeviceTConsole,
             1 => EmuDeviceType::EmuDeviceTGicd,
+            
+            9 => EmuDeviceType::EmuDeviceTICCSRE,
+            10 => EmuDeviceType::EmuDeviceTSGIR,
+            11 => EmuDeviceType::EmuDeviceTGICR,
+            
             2 => EmuDeviceType::EmuDeviceTGPPT,
             3 => EmuDeviceType::EmuDeviceTVirtioBlk,
             4 => EmuDeviceType::EmuDeviceTVirtioNet,
