@@ -17,7 +17,7 @@ use arm_gicv3::{
 use arm_gicv3::regs::ReadableReg;
 use arm_gicv3::regs::WriteableReg;
 
-use arm_gicv3::{gich_lrs_num, gic_set_act, gic_set_pend};
+use arm_gicv3::gich_lrs_num;
 
 #[derive(Copy, Clone, Debug)] pub enum IrqState {
     IrqSInactive,
@@ -47,10 +47,11 @@ impl IrqState {
     }
 }
 
-pub fn gic_set_state(int_id: usize, state: usize, gicr_id: u32) {
-    gic_set_act(int_id, (state & IrqState::IrqSActive as usize) != 0, gicr_id);
-    gic_set_pend(int_id, (state & IrqState::IrqSPend as usize) != 0, gicr_id);
-}
+// 这个放在 hal gicv3 中实现
+// pub fn gic_set_state(int_id: usize, state: usize, gicr_id: u32) {
+//     gic_set_act(int_id, (state & IrqState::IrqSActive as usize) != 0, gicr_id);
+//     gic_set_pend(int_id, (state & IrqState::IrqSPend as usize) != 0, gicr_id);
+// }
 
 
 
@@ -99,11 +100,56 @@ impl GicState {
         }
     }
 
-    pub fn save_state(&mut self) {}
+    pub fn save_state(&mut self) {
+        self.hcr = ICH_HCR_EL2::read();
+        // save VMCR_EL2: save and restore the virtual machine view of the GIC state.
+        self.vmcr = ICH_VMCR_EL2::read() as u32;
+        // save ICH_AP1Rn_EL2: Provides information about Group 1 virtual active priorities for EL2.
+        // if some bit set 1:There is a Group 1 interrupt active with this priority level which has not undergone priority drop.
+        self.save_aprn_regs();
+        // save lr
+        for i in 0..gich_lrs_num() {
+            self.lr[i] = GICH.lr(i);
+        }
+        // save ICC_SRE_EL1: EL1`s systregister use
+        self.sre_el1 = ICC_SRE_EL1::read() as u32;
+        // SAFETY: change the value of ICC_SRE_EL2 without GICC_SRE_EL2_ENABLE_bit
+        unsafe { ICC_SRE_EL2::write(ICC_SRE_EL2::read() & !GICC_SRE_EL2_ENABLE) }
+    }
 
-    pub fn restore_state(&self) {}
+    pub fn restore_state(&self) {
+        // make EL2 can use sysrem register
+        // SAFETY:
+        // Set Enable[3] bit to 1, and set the SRE[0] bits to 1
+        // And other bits set to 0
+        unsafe {
+            ICC_SRE_EL2::write(0b1001);
+        }
+        // restore ICC_SRE_EL1 for EL1
+        // SAFETY:
+        // Set the SRE[0] bits to 1
+        // And other bits set to 0
+        unsafe {
+            ICC_SRE_EL1::write(0x1);
+        }
+        isb();
+        // SAFETY: The value is saved last time
+        unsafe {
+            // restore HCR
+            ICH_HCR_EL2::write(self.hcr);
+            // restore ICH_VMCR_EL2
+            ICH_VMCR_EL2::write(self.vmcr as usize);
+        }
+        // restore aprn
+        self.restore_aprn_regs();
+        // restore lr
+        for i in 0..gich_lrs_num() {
+            GICH.set_lr(i, self.lr[i]);
+        }
+    }
 }
 
+/*
 trait InterruptContextTrait {
     fn save_state(&mut self);
     fn restore_state(&self);
@@ -158,6 +204,7 @@ impl InterruptContextTrait for GicState {
         }
     }
 }
+*/
 
 impl GicState {
     fn save_apr2(&mut self) {
